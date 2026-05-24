@@ -1,484 +1,669 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Rocket,
-  ArrowUp,
-  MessageCircle,
-  Trash2,
-  ExternalLink,
-  Plus,
-  TrendingUp,
-  Eye,
-  MousePointerClick,
-  Users,
-  Globe,
-  Activity,
-  ArrowUpRight,
-  ArrowDownRight,
+  Rocket, ArrowUp, Trash2, ExternalLink, Plus, TrendingUp, Eye,
+  MousePointerClick, Users, Globe, Activity, ArrowUpRight, ArrowDownRight,
+  Archive, Loader2, Shield, RefreshCw,
 } from "lucide-react";
-import { actions, useStore, timeAgo, Tool } from "@/lib/store";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard")({
   component: Dashboard,
 });
 
+// ── Types ────────────────────────────────────────────────────────────────────
+
+type AppData = {
+  id: string;
+  name: string;
+  tagline: string;
+  slug: string;
+  launchUrl: string | null;
+  iconUrl: string | null;
+  status: string;
+  createdAt: string;
+  publishedAt: string | null;
+};
+
+type AppsPage = {
+  items: AppData[];
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
+};
+
+type AnalyticsData = {
+  apps: Array<{ id: string; name: string; slug: string; iconUrl: string | null; status: string; launchUrl: string | null }>;
+  byApp: Record<string, Array<{ date: string; views: number }>>;
+  totals: Record<string, number>;
+};
+
+// ── Root ────────────────────────────────────────────────────────────────────
+
 function Dashboard() {
-  const { mode } = useStore();
-  return mode === "founder" ? <FounderDashboard /> : <UserDashboard />;
+  const { user, isAuthenticated, loading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      navigate({ to: "/login" });
+    }
+  }, [loading, isAuthenticated, navigate]);
+
+  if (loading) return <LoadingState />;
+  if (!isAuthenticated || !user) return null;
+
+  if (user.role === "ADMIN" || user.role === "MODERATOR") {
+    return <AdminDashboard user={user} />;
+  }
+
+  if (user.role === "CREATOR") {
+    return <CreatorDashboard user={user} />;
+  }
+
+  // Regular USER — prompt to upgrade
+  return <UserPrompt />;
 }
 
-/* ============================================================ */
-/*  USER (maker) DASHBOARD — friendly, cozy                     */
-/* ============================================================ */
+// ── Loading ──────────────────────────────────────────────────────────────────
 
-function UserDashboard() {
-  const { tools, comments, currentUserId, users } = useStore();
-  const me = users.find((u) => u.id === currentUserId)!;
-  const mine = tools
-    .filter((t) => t.makerId === currentUserId)
-    .sort((a, b) => b.createdAt - a.createdAt);
-  const totalUp = mine.reduce((a, t) => a + t.upvotes, 0);
-  const totalComments = comments.filter((c) => mine.some((t) => t.id === c.toolId)).length;
+function LoadingState() {
+  return (
+    <div className="flex items-center justify-center min-h-[60vh] text-muted-foreground gap-2">
+      <Loader2 className="size-5 animate-spin" />
+      <span>Loading dashboard…</span>
+    </div>
+  );
+}
+
+// ── User Prompt ──────────────────────────────────────────────────────────────
+
+function UserPrompt() {
+  return (
+    <div className="mx-auto max-w-xl px-4 py-20 text-center">
+      <h1 className="font-display text-3xl">You're in as a viewer</h1>
+      <p className="mt-3 text-muted-foreground">
+        To submit apps and see analytics, you need a Creator account. Sign out and register fresh, or contact an admin.
+      </p>
+      <Link to="/" className="mt-6 inline-flex items-center gap-2 rounded-full bg-primary text-foreground px-5 py-2.5 font-semibold">
+        Browse apps
+      </Link>
+    </div>
+  );
+}
+
+// ── Creator Dashboard ────────────────────────────────────────────────────────
+
+function CreatorDashboard({ user }: { user: { displayName?: string | null; email: string } }) {
+  const [mode, setMode] = useState<"apps" | "analytics">("apps");
+  const queryClient = useQueryClient();
+
+  const { data: appsPage, isLoading: appsLoading } = useQuery({
+    queryKey: ["mine-apps"],
+    queryFn: () => apiFetch<AppsPage>("/api/v1/apps/mine?limit=50&page=1"),
+  });
+
+  const { data: analytics, isLoading: analyticsLoading } = useQuery({
+    queryKey: ["mine-analytics"],
+    queryFn: () => apiFetch<AnalyticsData>("/api/v1/apps/mine/analytics"),
+    enabled: mode === "analytics",
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiFetch(`/api/v1/apps/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["mine-apps"] });
+      queryClient.invalidateQueries({ queryKey: ["mine-analytics"] });
+      toast.success("App deleted");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: (id: string) => apiFetch(`/api/v1/apps/${id}/archive`, { method: "POST" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["mine-apps"] });
+      toast.success("App archived");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const apps = appsPage?.items ?? [];
+  const name = user.displayName?.split(" ")[0] ?? user.email.split("@")[0];
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
+      {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
-          <h1 className="font-display text-4xl">Welcome back, {me.name.split(" ")[0]} 🌱</h1>
-          <p className="text-muted-foreground mt-1">Track your tools, upvotes, and conversations.</p>
+          <h1 className="font-display text-4xl">Welcome back, {name}</h1>
+          <p className="text-muted-foreground mt-1">Manage your apps and track performance.</p>
         </div>
-        <Link to="/submit" className="inline-flex items-center gap-2 rounded-full bg-primary text-foreground px-5 py-2.5 font-semibold sticker hover:-translate-y-0.5 transition">
-          <Plus className="size-4" /> New tool
-        </Link>
-      </div>
-
-      <div className="mt-6 grid sm:grid-cols-3 gap-3">
-        <StatCard icon={<Rocket className="size-5" />} label="Tools submitted" value={mine.length} tone="primary" />
-        <StatCard icon={<ArrowUp className="size-5" />} label="Total upvotes" value={totalUp} tone="mint" />
-        <StatCard icon={<MessageCircle className="size-5" />} label="Comments received" value={totalComments} tone="default" />
-      </div>
-
-      <h2 className="mt-10 font-display text-2xl">Your tools</h2>
-      <div className="mt-3 bg-card border border-border rounded-3xl divide-y divide-border overflow-hidden sticker">
-        {mine.length === 0 && (
-          <div className="p-10 text-center text-muted-foreground">
-            <p>You haven't planted any tools yet.</p>
-            <Link to="/submit" className="mt-3 inline-block text-mint font-medium hover:underline">Submit your first tool →</Link>
-          </div>
-        )}
-        {mine.map((t) => {
-          const c = comments.filter((x) => x.toolId === t.id).length;
-          return (
-            <div key={t.id} className="flex items-center gap-4 p-4 hover:bg-muted/40 transition">
-              <Link to="/tool/$toolId" params={{ toolId: t.id }} className="shrink-0">
-                <div className="size-12 rounded-2xl grid place-items-center sticker" style={{ backgroundColor: t.coverColor }}>
-                  <img src={t.faviconUrl} className="size-6 rounded" alt="" onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")} />
-                </div>
-              </Link>
-              <div className="flex-1 min-w-0">
-                <Link to="/tool/$toolId" params={{ toolId: t.id }} className="font-display text-lg hover:text-mint truncate block">{t.name}</Link>
-                <div className="text-xs text-muted-foreground truncate">{t.tagline} · {timeAgo(t.createdAt)} ago</div>
-              </div>
-              <div className="hidden sm:flex items-center gap-4 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1"><ArrowUp className="size-3.5 text-mint" /> {t.upvotes}</span>
-                <span className="flex items-center gap-1"><MessageCircle className="size-3.5" /> {c}</span>
-              </div>
-              <a href={t.url} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-mint">
-                <ExternalLink className="size-4" />
-              </a>
-              <button
-                onClick={() => {
-                  if (confirm(`Delete "${t.name}"?`)) {
-                    actions.deleteTool(t.id);
-                    toast.success("Tool deleted");
-                  }
-                }}
-                className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-              >
-                <Trash2 className="size-4" />
-              </button>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="mt-8 rounded-3xl border border-dashed border-border p-6 text-center bg-mint-soft/40">
-        <p className="text-sm">
-          Want traffic, clicks, referrers, and conversion charts?{" "}
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => {
-              actions.setMode("founder");
-              toast.success("Founder mode on ✨");
-            }}
-            className="font-semibold text-mint hover:underline"
+            onClick={() => setMode(mode === "apps" ? "analytics" : "apps")}
+            className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold hover:bg-muted/40 transition"
           >
-            Switch to Founder mode →
+            {mode === "apps" ? <><TrendingUp className="size-4" /> Analytics</> : <><Rocket className="size-4" /> Apps</>}
           </button>
+          <Link to="/submit" className="inline-flex items-center gap-2 rounded-full bg-primary text-foreground px-5 py-2.5 font-semibold hover:-translate-y-0.5 transition">
+            <Plus className="size-4" /> New app
+          </Link>
+        </div>
+      </div>
+
+      {mode === "apps" ? (
+        <>
+          {/* Stats */}
+          <div className="mt-6 grid sm:grid-cols-3 gap-3">
+            <StatCard icon={<Rocket className="size-5" />} label="Apps submitted" value={apps.length} tone="primary" />
+            <StatCard icon={<Eye className="size-5" />} label="Published" value={apps.filter(a => a.status === "PUBLISHED").length} tone="mint" />
+            <StatCard icon={<Activity className="size-5" />} label="In review" value={apps.filter(a => ["SUBMITTED", "IN_REVIEW", "APPROVED"].includes(a.status)).length} tone="default" />
+          </div>
+
+          {/* Apps list */}
+          <h2 className="mt-10 font-display text-2xl">Your apps</h2>
+          <div className="mt-3 bg-card border border-border rounded-3xl divide-y divide-border overflow-hidden">
+            {appsLoading && (
+              <div className="p-10 text-center text-muted-foreground flex items-center justify-center gap-2">
+                <Loader2 className="size-4 animate-spin" /> Loading…
+              </div>
+            )}
+            {!appsLoading && apps.length === 0 && (
+              <div className="p-10 text-center text-muted-foreground">
+                <p>No apps yet.</p>
+                <Link to="/submit" className="mt-3 inline-block font-medium hover:underline">Submit your first app →</Link>
+              </div>
+            )}
+            {apps.map((app) => (
+              <AppRow
+                key={app.id}
+                app={app}
+                onDelete={() => { if (confirm(`Delete "${app.name}"?`)) deleteMutation.mutate(app.id); }}
+                onArchive={() => { if (confirm(`Archive "${app.name}"? It will be hidden from public.`)) archiveMutation.mutate(app.id); }}
+                isDeleting={deleteMutation.isPending && deleteMutation.variables === app.id}
+                isArchiving={archiveMutation.isPending && archiveMutation.variables === app.id}
+              />
+            ))}
+          </div>
+        </>
+      ) : (
+        <AnalyticsView analytics={analytics} loading={analyticsLoading} />
+      )}
+    </div>
+  );
+}
+
+// ── App Row ──────────────────────────────────────────────────────────────────
+
+function AppRow({ app, onDelete, onArchive, isDeleting, isArchiving }: {
+  app: AppData;
+  onDelete: () => void;
+  onArchive: () => void;
+  isDeleting: boolean;
+  isArchiving: boolean;
+}) {
+  const canArchive = app.status === "PUBLISHED";
+
+  return (
+    <div className="flex items-center gap-4 p-4 hover:bg-muted/40 transition">
+      <a href={app.launchUrl ?? "#"} target="_blank" rel="noopener noreferrer" className="shrink-0">
+        <div className="size-12 rounded-2xl bg-muted grid place-items-center overflow-hidden">
+          {app.iconUrl
+            ? <img src={app.iconUrl} className="size-8 rounded" alt="" />
+            : <Rocket className="size-5 text-muted-foreground" />}
+        </div>
+      </a>
+      <div className="flex-1 min-w-0">
+        <div className="font-display text-lg truncate">{app.name}</div>
+        <div className="text-xs text-muted-foreground truncate flex items-center gap-1.5">
+          <StatusBadge status={app.status} />
+          <span>·</span>
+          <span>{app.tagline}</span>
+        </div>
+      </div>
+      {app.launchUrl && (
+        <a href={app.launchUrl} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground">
+          <ExternalLink className="size-4" />
+        </a>
+      )}
+      {canArchive && (
+        <button
+          onClick={onArchive}
+          disabled={isArchiving}
+          className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-yellow-600"
+          title="Archive (hide)"
+        >
+          {isArchiving ? <Loader2 className="size-4 animate-spin" /> : <Archive className="size-4" />}
+        </button>
+      )}
+      <button
+        onClick={onDelete}
+        disabled={isDeleting}
+        className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+        title="Delete"
+      >
+        {isDeleting ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+      </button>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const colors: Record<string, string> = {
+    PUBLISHED:  "text-green-600 bg-green-50",
+    DRAFT:      "text-muted-foreground bg-muted",
+    SUBMITTED:  "text-yellow-700 bg-yellow-50",
+    IN_REVIEW:  "text-blue-600 bg-blue-50",
+    APPROVED:   "text-blue-600 bg-blue-50",
+    REJECTED:   "text-red-600 bg-red-50",
+    ARCHIVED:   "text-red-600 bg-red-50",
+  };
+  return (
+    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide ${colors[status] ?? "text-muted-foreground bg-muted"}`}>
+      {status}
+    </span>
+  );
+}
+
+// ── Analytics View ───────────────────────────────────────────────────────────
+
+function AnalyticsView({ analytics, loading }: { analytics: AnalyticsData | undefined; loading: boolean }) {
+  const totalViews = useMemo(() =>
+    analytics ? Object.values(analytics.totals).reduce((a, b) => a + b, 0) : 0,
+    [analytics]
+  );
+
+  const combinedSeries = useMemo(() => {
+    if (!analytics) return new Array(30).fill(0);
+    // Build a 30-day date series
+    const days: string[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      days.push(d.toISOString().slice(0, 10));
+    }
+    return days.map(date =>
+      Object.values(analytics.byApp).reduce((sum, series) => {
+        const row = series.find(s => s.date === date);
+        return sum + (row?.views ?? 0);
+      }, 0)
+    );
+  }, [analytics]);
+
+  if (loading) return (
+    <div className="mt-10 flex items-center justify-center gap-2 text-muted-foreground py-20">
+      <Loader2 className="size-5 animate-spin" /> Loading analytics…
+    </div>
+  );
+
+  const apps = analytics?.apps ?? [];
+  const totals = analytics?.totals ?? {};
+
+  return (
+    <div className="bg-foreground text-background -mx-4 px-4 py-10 mt-6 rounded-3xl">
+      <div className="flex items-center justify-between flex-wrap gap-4 mb-8">
+        <div>
+          <div className="inline-flex items-center gap-2 rounded-full bg-mint/15 text-mint px-3 py-1 text-xs font-bold tracking-wide uppercase">
+            <Activity className="size-3.5" /> Live analytics · Last 30 days
+          </div>
+          <h2 className="mt-3 font-display text-4xl text-background">Traffic overview</h2>
+        </div>
+      </div>
+
+      {/* KPIs */}
+      <div className="grid grid-cols-2 gap-3 mb-6">
+        <div className="rounded-2xl bg-background/5 border border-background/10 p-5">
+          <div className="text-xs text-background/60 font-semibold uppercase tracking-wider flex items-center gap-2">
+            <Eye className="size-4 text-mint" /> Total views
+          </div>
+          <div className="mt-2 font-display text-4xl text-background">{totalViews.toLocaleString()}</div>
+        </div>
+        <div className="rounded-2xl bg-background/5 border border-background/10 p-5">
+          <div className="text-xs text-background/60 font-semibold uppercase tracking-wider flex items-center gap-2">
+            <Rocket className="size-4 text-mint" /> Apps tracked
+          </div>
+          <div className="mt-2 font-display text-4xl text-background">{apps.length}</div>
+        </div>
+      </div>
+
+      {/* Chart */}
+      <div className="rounded-2xl bg-background/5 border border-background/10 p-6 mb-6">
+        <h3 className="font-display text-xl text-background mb-4">Daily visits</h3>
+        {totalViews === 0 ? (
+          <div className="text-background/40 text-sm py-8 text-center">
+            No traffic data yet. Visits will appear here as users discover your apps.
+          </div>
+        ) : (
+          <BigChart series={combinedSeries} />
+        )}
+      </div>
+
+      {/* Per-app table */}
+      {apps.length > 0 && (
+        <div className="rounded-2xl bg-background/5 border border-background/10 overflow-hidden">
+          <div className="p-6">
+            <h3 className="font-display text-xl text-background">Per-app performance</h3>
+          </div>
+          <table className="w-full text-sm">
+            <thead className="text-[10px] uppercase tracking-wider text-background/50 border-y border-background/10">
+              <tr>
+                <th className="text-left px-6 py-3">App</th>
+                <th className="text-right px-6 py-3">Views (30d)</th>
+                <th className="text-right px-6 py-3">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {apps.map(app => (
+                <tr key={app.id} className="border-t border-background/10 hover:bg-background/5 transition">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="size-9 rounded-xl bg-background/10 grid place-items-center shrink-0">
+                        {app.iconUrl
+                          ? <img src={app.iconUrl} className="size-5 rounded" alt="" />
+                          : <Rocket className="size-4 text-background/40" />}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-background">{app.name}</div>
+                        <div className="text-xs text-background/40">{app.slug}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-right text-background tabular-nums">
+                    {(totals[app.id] ?? 0).toLocaleString()}
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <span className="text-[10px] font-bold text-background/60">{app.status}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Admin Dashboard ──────────────────────────────────────────────────────────
+
+type AdminApp = {
+  id: string;
+  name: string;
+  tagline: string;
+  slug: string;
+  launchUrl: string | null;
+  iconUrl: string | null;
+  status: string;
+  createdAt: string;
+  creator: { displayName: string; user: { email: string } } | null;
+};
+
+function AdminDashboard({ user }: { user: { email: string; displayName?: string | null; role: string } }) {
+  const queryClient = useQueryClient();
+  const [tab, setTab] = useState<"apps" | "users">("apps");
+
+  const { data: allAppsPage, isLoading: allAppsLoading, refetch } = useQuery({
+    queryKey: ["admin-all-apps"],
+    queryFn: () => apiFetch<{ items: AdminApp[]; total: number }>("/api/v1/apps/admin?limit=100&page=1"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiFetch(`/api/v1/apps/${id}/force`, { method: "DELETE" }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-all-apps"] }); toast.success("App permanently deleted"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: (id: string) => apiFetch(`/api/v1/apps/${id}/archive`, { method: "POST" }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin-all-apps"] }); toast.success("App hidden for inspection"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const name = user.displayName?.split(" ")[0] ?? user.email.split("@")[0];
+  const apps = allAppsPage?.items ?? [];
+
+  return (
+    <div className="mx-auto max-w-5xl px-4 py-10">
+      {/* Header */}
+      <div className="flex items-start justify-between flex-wrap gap-4">
+        <div>
+          <div className="inline-flex items-center gap-2 rounded-full bg-destructive/10 text-destructive px-3 py-1 text-xs font-bold tracking-wide uppercase mb-2">
+            <Shield className="size-3.5" /> {user.role}
+          </div>
+          <h1 className="font-display text-4xl">Admin Dashboard</h1>
+          <p className="text-muted-foreground mt-1">Logged in as {user.email}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => refetch()} className="p-2 rounded-lg hover:bg-muted text-muted-foreground">
+            <RefreshCw className="size-4" />
+          </button>
+          <Link to="/submit" className="inline-flex items-center gap-2 rounded-full bg-primary text-foreground px-5 py-2.5 font-semibold">
+            <Plus className="size-4" /> Submit app
+          </Link>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="mt-6 flex gap-1 border-b border-border">
+        {(["apps", "users"] as const).map(t => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`px-4 py-2 text-sm font-semibold capitalize transition border-b-2 -mb-px ${tab === t ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+          >
+            {t === "apps" ? `All Apps (${apps.length})` : "User Management"}
+          </button>
+        ))}
+      </div>
+
+      {tab === "apps" && (
+        <div className="mt-6">
+          {allAppsLoading && (
+            <div className="flex items-center justify-center gap-2 text-muted-foreground py-20">
+              <Loader2 className="size-5 animate-spin" /> Loading…
+            </div>
+          )}
+          {!allAppsLoading && apps.length === 0 && (
+            <div className="p-10 text-center text-muted-foreground">No apps found.</div>
+          )}
+          <div className="bg-card border border-border rounded-3xl divide-y divide-border overflow-hidden">
+            {apps.map((app: AdminApp) => {
+              const canArchive = ["PUBLISHED", "SUBMITTED", "IN_REVIEW", "APPROVED"].includes(app.status);
+              return (
+                <div key={app.id} className="flex items-center gap-4 p-4 hover:bg-muted/40 transition">
+                  <div className="size-12 rounded-2xl bg-muted grid place-items-center shrink-0 overflow-hidden">
+                    {app.iconUrl
+                      ? <img src={app.iconUrl} className="size-8 rounded" alt="" />
+                      : <Rocket className="size-5 text-muted-foreground" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-display text-base truncate">{app.name}</div>
+                    <div className="text-xs text-muted-foreground truncate flex items-center gap-1.5">
+                      <StatusBadge status={app.status} />
+                      <span>·</span>
+                      <span>{app.creator?.user?.email ?? "no creator"}</span>
+                    </div>
+                    {app.launchUrl && (
+                      <div className="text-xs text-blue-500 truncate">{app.launchUrl}</div>
+                    )}
+                  </div>
+                  {app.launchUrl && (
+                    <a href={app.launchUrl} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg hover:bg-muted text-muted-foreground">
+                      <ExternalLink className="size-4" />
+                    </a>
+                  )}
+                  {canArchive && (
+                    <button
+                      onClick={() => { if (confirm(`Hide "${app.name}" for inspection?`)) archiveMutation.mutate(app.id); }}
+                      disabled={archiveMutation.isPending && archiveMutation.variables === app.id}
+                      className="p-2 rounded-lg hover:bg-yellow-50 text-muted-foreground hover:text-yellow-700"
+                      title="Hide for inspection"
+                    >
+                      {archiveMutation.isPending && archiveMutation.variables === app.id
+                        ? <Loader2 className="size-4 animate-spin" />
+                        : <Archive className="size-4" />}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { if (confirm(`PERMANENTLY delete "${app.name}"? Cannot be undone.`)) deleteMutation.mutate(app.id); }}
+                    disabled={deleteMutation.isPending && deleteMutation.variables === app.id}
+                    className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                    title="Delete permanently"
+                  >
+                    {deleteMutation.isPending && deleteMutation.variables === app.id
+                      ? <Loader2 className="size-4 animate-spin" />
+                      : <Trash2 className="size-4" />}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {tab === "users" && <UserManagementPanel />}
+    </div>
+  );
+}
+
+// ── User Management ──────────────────────────────────────────────────────────
+
+function UserManagementPanel() {
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState("ADMIN");
+  const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleSetRole = async () => {
+    if (!email.trim()) { setResult({ ok: false, msg: "Enter an email address." }); return; }
+    setLoading(true);
+    setResult(null);
+    try {
+      const data = await apiFetch<{ email: string; role: string }>("/api/v1/users/admin/set-role", {
+        method: "POST",
+        body: { email: email.trim().toLowerCase(), role },
+      });
+      setResult({ ok: true, msg: `Done — ${data.email} is now ${data.role}` });
+      toast.success(`Role updated for ${data.email}`);
+    } catch (e: any) {
+      setResult({ ok: false, msg: e?.message ?? "Failed to update role" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="mt-6">
+      <div className="bg-card border border-border rounded-3xl p-6">
+        <h3 className="font-display text-xl mb-1">Set User Role</h3>
+        <p className="text-sm text-muted-foreground mb-5">
+          Update any user's role. Use this to grant yourself ADMIN, promote moderators, or reset roles.
         </p>
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex-1 min-w-48">
+            <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mb-1.5 block">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleSetRole()}
+              placeholder="user@example.com"
+              className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mb-1.5 block">Role</label>
+            <select
+              value={role}
+              onChange={e => setRole(e.target.value)}
+              className="bg-background border border-border rounded-xl px-3 py-2 text-sm focus:outline-none"
+            >
+              <option value="ADMIN">ADMIN</option>
+              <option value="MODERATOR">MODERATOR</option>
+              <option value="CREATOR">CREATOR</option>
+              <option value="USER">USER</option>
+            </select>
+          </div>
+          <button
+            onClick={handleSetRole}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-xl bg-foreground text-background px-5 py-2 text-sm font-semibold hover:bg-foreground/90 transition disabled:opacity-50"
+          >
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <Shield className="size-4" />}
+            Set Role
+          </button>
+        </div>
+        {result && (
+          <p className={`mt-3 text-sm font-medium ${result.ok ? "text-green-600" : "text-destructive"}`}>
+            {result.msg}
+          </p>
+        )}
+      </div>
+
+      <div className="mt-4 bg-muted/30 border border-border rounded-3xl p-6">
+        <h3 className="font-semibold mb-2">Quick grant admin</h3>
+        <p className="text-sm text-muted-foreground mb-3">
+          To grant admin to <strong>idomena29@gmail.com</strong>, enter that email above and select ADMIN, then click Set Role.
+        </p>
+        <button
+          onClick={() => { setEmail("idomena29@gmail.com"); setRole("ADMIN"); }}
+          className="text-sm text-foreground underline hover:no-underline"
+        >
+          Pre-fill idomena29@gmail.com
+        </button>
       </div>
     </div>
   );
 }
 
+// ── Stat Card ────────────────────────────────────────────────────────────────
+
 function StatCard({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: number; tone: "primary" | "mint" | "default" }) {
   const bg = tone === "primary" ? "bg-primary-soft" : tone === "mint" ? "bg-mint-soft" : "bg-card";
   return (
-    <div className={`${bg} border border-border rounded-3xl p-5 sticker`}>
+    <div className={`${bg} border border-border rounded-3xl p-5`}>
       <div className="flex items-center gap-2 text-foreground/70 text-sm font-semibold">
-        <span>{icon}</span>
-        {label}
+        <span>{icon}</span> {label}
       </div>
       <div className="mt-2 font-display text-4xl">{value}</div>
     </div>
   );
 }
 
-/* ============================================================ */
-/*  FOUNDER DASHBOARD — dark, dense, analytics-grade            */
-/* ============================================================ */
-
-/** Seeded RNG so chart numbers are stable per tool */
-function seedRand(seed: number) {
-  let s = seed;
-  return () => {
-    s = (s * 9301 + 49297) % 233280;
-    return s / 233280;
-  };
-}
-
-function genSeries(tool: Tool, days = 30) {
-  const rng = seedRand(tool.id.charCodeAt(1) * 7 + tool.upvotes);
-  const base = 40 + tool.upvotes * 3;
-  return Array.from({ length: days }, (_, i) => {
-    const wave = Math.sin((i / days) * Math.PI * 2) * 0.3;
-    const noise = rng() * 0.6 + 0.7;
-    return Math.round(base * noise * (1 + wave + i / (days * 1.5)));
-  });
-}
-
-function FounderDashboard() {
-  const { tools, currentUserId, users, comments } = useStore();
-  const me = users.find((u) => u.id === currentUserId)!;
-  const mine = tools.filter((t) => t.makerId === currentUserId);
-
-  const perTool = useMemo(() => {
-    return mine.map((t) => {
-      const series = genSeries(t, 30);
-      const views = series.reduce((a, b) => a + b, 0);
-      const rng = seedRand(t.id.charCodeAt(1) * 13);
-      const clicks = Math.round(views * (0.18 + rng() * 0.18));
-      const ctr = views > 0 ? (clicks / views) * 100 : 0;
-      const prev = views * (0.85 + rng() * 0.3);
-      const trend = ((views - prev) / Math.max(prev, 1)) * 100;
-      return { tool: t, series, views, clicks, ctr, trend };
-    });
-  }, [mine]);
-
-  const totalViews = perTool.reduce((a, p) => a + p.views, 0);
-  const totalClicks = perTool.reduce((a, p) => a + p.clicks, 0);
-  const avgCtr = totalViews ? (totalClicks / totalViews) * 100 : 0;
-  const totalComments = comments.filter((c) => mine.some((t) => t.id === c.toolId)).length;
-  const totalSeries = useMemo(() => {
-    const days = 30;
-    const out = new Array(days).fill(0);
-    perTool.forEach((p) => p.series.forEach((v, i) => (out[i] += v)));
-    return out;
-  }, [perTool]);
-
-  const sources = [
-    { name: "Imagine yard", value: 42, color: "var(--mint)" },
-    { name: "Twitter / X", value: 23, color: "oklch(0.72 0.16 220)" },
-    { name: "Hacker News", value: 14, color: "oklch(0.7 0.18 50)" },
-    { name: "Direct", value: 12, color: "oklch(0.65 0.2 300)" },
-    { name: "Other", value: 9, color: "oklch(0.86 0.16 92)" },
-  ];
-
-  return (
-    <div className="bg-foreground text-background min-h-[calc(100vh-4rem)] -mt-px">
-      <div className="mx-auto max-w-7xl px-4 py-10">
-        {/* Header row */}
-        <div className="flex items-start justify-between flex-wrap gap-4">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-mint/15 text-mint px-3 py-1 text-xs font-bold tracking-wide uppercase">
-              <Activity className="size-3.5" />
-              Founder mode · Live
-            </div>
-            <h1 className="mt-3 font-display text-5xl text-background">
-              Hey {me.name.split(" ")[0]}, here's how it's going.
-            </h1>
-            <p className="text-background/60 mt-1">Last 30 days · {mine.length} tools tracked</p>
-          </div>
-          <button
-            onClick={() => {
-              actions.setMode("user");
-              toast("Back to user mode");
-            }}
-            className="text-xs font-semibold rounded-full bg-background/10 hover:bg-background/20 px-4 py-2 transition"
-          >
-            ← Back to user mode
-          </button>
-        </div>
-
-        {/* KPI cards */}
-        <div className="mt-8 grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <KPI icon={<Eye className="size-4" />} label="Views" value={totalViews.toLocaleString()} delta={"+18.4%"} positive />
-          <KPI icon={<MousePointerClick className="size-4" />} label="Outbound clicks" value={totalClicks.toLocaleString()} delta={"+9.1%"} positive />
-          <KPI icon={<TrendingUp className="size-4" />} label="Avg CTR" value={`${avgCtr.toFixed(1)}%`} delta={"+0.6pt"} positive />
-          <KPI icon={<MessageCircle className="size-4" />} label="Conversations" value={totalComments.toString()} delta={"-2"} positive={false} />
-        </div>
-
-        {/* Main chart + sources */}
-        <div className="mt-6 grid lg:grid-cols-3 gap-3">
-          <div className="lg:col-span-2 rounded-3xl bg-background/5 border border-background/10 p-6">
-            <div className="flex items-center justify-between mb-1">
-              <div>
-                <h2 className="font-display text-2xl text-background">Traffic</h2>
-                <p className="text-xs text-background/60">Daily views across all your tools</p>
-              </div>
-              <div className="flex gap-1 text-xs">
-                {["7d", "30d", "90d"].map((r) => (
-                  <button key={r} className={`px-2.5 py-1 rounded-full font-semibold ${r === "30d" ? "bg-mint text-mint-foreground" : "bg-background/10 text-background/70 hover:bg-background/20"}`}>
-                    {r}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <BigChart series={totalSeries} />
-          </div>
-
-          <div className="rounded-3xl bg-background/5 border border-background/10 p-6">
-            <h2 className="font-display text-2xl text-background">Top sources</h2>
-            <p className="text-xs text-background/60">Where visitors come from</p>
-            <div className="mt-5 space-y-3">
-              {sources.map((s) => (
-                <div key={s.name}>
-                  <div className="flex justify-between text-xs font-semibold mb-1.5">
-                    <span className="flex items-center gap-2 text-background">
-                      <span className="size-2.5 rounded-full" style={{ background: s.color }} />
-                      {s.name}
-                    </span>
-                    <span className="text-background/60">{s.value}%</span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-background/10 overflow-hidden">
-                    <div className="h-full rounded-full" style={{ width: `${s.value * 2.3}%`, background: s.color }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Per-tool table */}
-        <div className="mt-6 rounded-3xl bg-background/5 border border-background/10 overflow-hidden">
-          <div className="p-6 flex items-center justify-between">
-            <div>
-              <h2 className="font-display text-2xl text-background">Tool performance</h2>
-              <p className="text-xs text-background/60">Click a row to open the public page</p>
-            </div>
-            <Link to="/submit" className="inline-flex items-center gap-1.5 rounded-full bg-mint text-mint-foreground px-3 py-1.5 text-xs font-bold hover:-translate-y-0.5 transition">
-              <Plus className="size-3.5" /> New tool
-            </Link>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-[10px] uppercase tracking-wider text-background/50 border-y border-background/10">
-                <tr>
-                  <th className="text-left font-semibold px-6 py-3">Tool</th>
-                  <th className="text-left font-semibold px-2 py-3 w-32">Trend</th>
-                  <th className="text-right font-semibold px-3 py-3">Views</th>
-                  <th className="text-right font-semibold px-3 py-3">Clicks</th>
-                  <th className="text-right font-semibold px-3 py-3">CTR</th>
-                  <th className="text-right font-semibold px-3 py-3">Δ 30d</th>
-                  <th className="text-right font-semibold px-6 py-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {perTool.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="p-10 text-center text-background/60">
-                      No tools yet.{" "}
-                      <Link to="/submit" className="text-mint font-semibold hover:underline">
-                        Ship your first one →
-                      </Link>
-                    </td>
-                  </tr>
-                ) : (
-                  perTool.map((p) => (
-                    <tr key={p.tool.id} className="border-t border-background/10 hover:bg-background/5 transition">
-                      <td className="px-6 py-4">
-                        <Link to="/tool/$toolId" params={{ toolId: p.tool.id }} className="flex items-center gap-3">
-                          <div className="size-9 rounded-xl grid place-items-center shrink-0" style={{ backgroundColor: p.tool.coverColor }}>
-                            <img src={p.tool.faviconUrl} className="size-5 rounded" alt="" onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")} />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="font-semibold text-background truncate">{p.tool.name}</div>
-                            <div className="text-xs text-background/50 truncate">{p.tool.domain}</div>
-                          </div>
-                        </Link>
-                      </td>
-                      <td className="px-2 py-4">
-                        <Sparkline series={p.series} />
-                      </td>
-                      <td className="px-3 py-4 text-right text-background tabular-nums">{p.views.toLocaleString()}</td>
-                      <td className="px-3 py-4 text-right text-background tabular-nums">{p.clicks.toLocaleString()}</td>
-                      <td className="px-3 py-4 text-right text-background tabular-nums">{p.ctr.toFixed(1)}%</td>
-                      <td className={`px-3 py-4 text-right font-semibold tabular-nums ${p.trend >= 0 ? "text-mint" : "text-destructive"}`}>
-                        <span className="inline-flex items-center gap-0.5">
-                          {p.trend >= 0 ? <ArrowUpRight className="size-3.5" /> : <ArrowDownRight className="size-3.5" />}
-                          {Math.abs(p.trend).toFixed(1)}%
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <a href={p.tool.url} target="_blank" rel="noopener noreferrer" className="inline-flex p-1.5 rounded-lg hover:bg-background/10 text-background/60 hover:text-background">
-                          <ExternalLink className="size-4" />
-                        </a>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Bottom row: live visitors + countries */}
-        <div className="mt-6 grid lg:grid-cols-2 gap-3">
-          <div className="rounded-3xl bg-background/5 border border-background/10 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="font-display text-2xl text-background flex items-center gap-2">
-                  <span className="relative flex size-2.5">
-                    <span className="absolute inset-0 rounded-full bg-mint animate-ping opacity-60" />
-                    <span className="relative rounded-full bg-mint size-2.5" />
-                  </span>
-                  Right now
-                </h2>
-                <p className="text-xs text-background/60">{Math.max(3, Math.round(totalViews / 800))} live visitors</p>
-              </div>
-            </div>
-            <div className="space-y-2 text-sm">
-              {[
-                { tool: perTool[0]?.tool, page: "/", country: "🇺🇸 US", time: "12s" },
-                { tool: perTool[1]?.tool ?? perTool[0]?.tool, page: "/pricing", country: "🇩🇪 DE", time: "34s" },
-                { tool: perTool[0]?.tool, page: "/", country: "🇯🇵 JP", time: "1m" },
-                { tool: perTool[2]?.tool ?? perTool[0]?.tool, page: "/blog/launch", country: "🇧🇷 BR", time: "2m" },
-              ].filter((r) => r.tool).map((r, i) => (
-                <div key={i} className="flex items-center gap-3 py-2 border-b border-background/5 last:border-0">
-                  <span className="text-base">{r.country}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-background truncate">
-                      <span className="text-background/60">visited</span> {r.tool!.name}
-                      <span className="text-background/40"> {r.page}</span>
-                    </div>
-                  </div>
-                  <span className="text-xs text-background/40 tabular-nums">{r.time} ago</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-3xl bg-background/5 border border-background/10 p-6">
-            <h2 className="font-display text-2xl text-background flex items-center gap-2">
-              <Globe className="size-5 text-mint" /> Top countries
-            </h2>
-            <p className="text-xs text-background/60">Last 30 days</p>
-            <div className="mt-4 space-y-2.5">
-              {[
-                { flag: "🇺🇸", name: "United States", pct: 38 },
-                { flag: "🇬🇧", name: "United Kingdom", pct: 14 },
-                { flag: "🇩🇪", name: "Germany", pct: 11 },
-                { flag: "🇯🇵", name: "Japan", pct: 8 },
-                { flag: "🇧🇷", name: "Brazil", pct: 6 },
-                { flag: "🇮🇳", name: "India", pct: 5 },
-              ].map((c) => (
-                <div key={c.name} className="flex items-center gap-3">
-                  <span className="text-base w-6">{c.flag}</span>
-                  <span className="text-sm text-background w-44 truncate">{c.name}</span>
-                  <div className="flex-1 h-1.5 rounded-full bg-background/10 overflow-hidden">
-                    <div className="h-full bg-mint rounded-full" style={{ width: `${c.pct * 2.5}%` }} />
-                  </div>
-                  <span className="text-xs text-background/60 tabular-nums w-8 text-right">{c.pct}%</span>
-                </div>
-              ))}
-            </div>
-            <div className="mt-5 flex items-center gap-2 text-xs text-background/60">
-              <Users className="size-3.5" />
-              <span>That's {Math.round(totalViews * 0.65).toLocaleString()} unique humans this month.</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function KPI({ icon, label, value, delta, positive }: { icon: React.ReactNode; label: string; value: string; delta: string; positive: boolean }) {
-  return (
-    <div className="rounded-3xl bg-background/5 border border-background/10 p-5">
-      <div className="flex items-center gap-2 text-xs text-background/60 font-semibold uppercase tracking-wider">
-        <span className="text-mint">{icon}</span>
-        {label}
-      </div>
-      <div className="mt-2 font-display text-4xl text-background">{value}</div>
-      <div className={`mt-1 text-xs font-semibold inline-flex items-center gap-1 ${positive ? "text-mint" : "text-destructive"}`}>
-        {positive ? <ArrowUpRight className="size-3" /> : <ArrowDownRight className="size-3" />}
-        {delta} <span className="text-background/40 font-medium ml-1">vs prev 30d</span>
-      </div>
-    </div>
-  );
-}
+// ── Chart ────────────────────────────────────────────────────────────────────
 
 function BigChart({ series }: { series: number[] }) {
-  const w = 720;
-  const h = 200;
+  const w = 720, h = 200;
   const max = Math.max(...series, 1);
   const min = Math.min(...series);
-  const stepX = w / (series.length - 1);
+  const stepX = w / Math.max(series.length - 1, 1);
   const points = series.map((v, i) => [i * stepX, h - ((v - min) / (max - min || 1)) * (h - 20) - 10] as const);
   const path = points.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
   const area = `${path} L${w},${h} L0,${h} Z`;
 
   return (
-    <div className="mt-5 -mx-2">
-      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-48" preserveAspectRatio="none">
+    <div className="mt-2 -mx-2">
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-44" preserveAspectRatio="none">
         <defs>
-          <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="oklch(0.78 0.13 168)" stopOpacity="0.45" />
+          <linearGradient id="af" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="oklch(0.78 0.13 168)" stopOpacity="0.4" />
             <stop offset="100%" stopColor="oklch(0.78 0.13 168)" stopOpacity="0" />
           </linearGradient>
         </defs>
-        {/* gridlines */}
-        {[0.25, 0.5, 0.75].map((g) => (
+        {[0.25, 0.5, 0.75].map(g => (
           <line key={g} x1="0" y1={h * g} x2={w} y2={h * g} stroke="currentColor" strokeOpacity="0.08" strokeDasharray="3 6" />
         ))}
-        <path d={area} fill="url(#chartFill)" />
+        <path d={area} fill="url(#af)" />
         <path d={path} fill="none" stroke="oklch(0.78 0.13 168)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-        {/* last point dot */}
         {points.length > 0 && (
           <circle cx={points[points.length - 1][0]} cy={points[points.length - 1][1]} r="4" fill="oklch(0.78 0.13 168)" />
         )}
       </svg>
     </div>
-  );
-}
-
-function Sparkline({ series }: { series: number[] }) {
-  const w = 110;
-  const h = 28;
-  const max = Math.max(...series, 1);
-  const min = Math.min(...series);
-  const stepX = w / (series.length - 1);
-  const path = series
-    .map((v, i) => {
-      const x = i * stepX;
-      const y = h - ((v - min) / (max - min || 1)) * (h - 4) - 2;
-      return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="w-28 h-7" preserveAspectRatio="none">
-      <path d={path} fill="none" stroke="oklch(0.78 0.13 168)" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
-    </svg>
   );
 }
