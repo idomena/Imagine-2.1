@@ -2,8 +2,8 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Rocket, ArrowUp, Trash2, ExternalLink, Plus, TrendingUp, Eye,
-  MousePointerClick, Users, Globe, Activity, ArrowUpRight, ArrowDownRight,
+  Rocket, Trash2, ExternalLink, Plus, TrendingUp, Eye,
+  Activity, ArrowUpRight, ArrowDownRight,
   Archive, Loader2, Shield, RefreshCw,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -65,7 +65,6 @@ function Dashboard() {
     return <CreatorDashboard user={user} />;
   }
 
-  // Regular USER — prompt to upgrade
   return <UserPrompt />;
 }
 
@@ -137,7 +136,6 @@ function CreatorDashboard({ user }: { user: { displayName?: string | null; email
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
-      {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
           <h1 className="font-display text-4xl">Welcome back, {name}</h1>
@@ -158,14 +156,12 @@ function CreatorDashboard({ user }: { user: { displayName?: string | null; email
 
       {mode === "apps" ? (
         <>
-          {/* Stats */}
           <div className="mt-6 grid sm:grid-cols-3 gap-3">
-            <StatCard icon={<Rocket className="size-5" />} label="Apps submitted" value={apps.length} tone="primary" />
+            <StatCard icon={<Rocket className="size-5" />} label="Apps" value={apps.length} tone="primary" />
             <StatCard icon={<Eye className="size-5" />} label="Published" value={apps.filter(a => a.status === "PUBLISHED").length} tone="mint" />
             <StatCard icon={<Activity className="size-5" />} label="In review" value={apps.filter(a => ["SUBMITTED", "IN_REVIEW", "APPROVED"].includes(a.status)).length} tone="default" />
           </div>
 
-          {/* Apps list */}
           <h2 className="mt-10 font-display text-2xl">Your apps</h2>
           <div className="mt-3 bg-card border border-border rounded-3xl divide-y divide-border overflow-hidden">
             {appsLoading && (
@@ -184,7 +180,7 @@ function CreatorDashboard({ user }: { user: { displayName?: string | null; email
                 key={app.id}
                 app={app}
                 onDelete={() => { if (confirm(`Delete "${app.name}"?`)) deleteMutation.mutate(app.id); }}
-                onArchive={() => { if (confirm(`Archive "${app.name}"? It will be hidden from public.`)) archiveMutation.mutate(app.id); }}
+                onArchive={() => { if (confirm(`Archive "${app.name}"? It will be hidden from public listings.`)) archiveMutation.mutate(app.id); }}
                 isDeleting={deleteMutation.isPending && deleteMutation.variables === app.id}
                 isArchiving={archiveMutation.isPending && archiveMutation.variables === app.id}
               />
@@ -211,13 +207,11 @@ function AppRow({ app, onDelete, onArchive, isDeleting, isArchiving }: {
 
   return (
     <div className="flex items-center gap-4 p-4 hover:bg-muted/40 transition">
-      <a href={app.launchUrl ?? "#"} target="_blank" rel="noopener noreferrer" className="shrink-0">
-        <div className="size-12 rounded-2xl bg-muted grid place-items-center overflow-hidden">
-          {app.iconUrl
-            ? <img src={app.iconUrl} className="size-8 rounded" alt="" />
-            : <Rocket className="size-5 text-muted-foreground" />}
-        </div>
-      </a>
+      <div className="size-12 rounded-2xl bg-muted grid place-items-center overflow-hidden shrink-0">
+        {app.iconUrl
+          ? <img src={app.iconUrl} className="size-8 rounded" alt="" />
+          : <Rocket className="size-5 text-muted-foreground" />}
+      </div>
       <div className="flex-1 min-w-0">
         <div className="font-display text-lg truncate">{app.name}</div>
         <div className="text-xs text-muted-foreground truncate flex items-center gap-1.5">
@@ -236,7 +230,7 @@ function AppRow({ app, onDelete, onArchive, isDeleting, isArchiving }: {
           onClick={onArchive}
           disabled={isArchiving}
           className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-yellow-600"
-          title="Archive (hide)"
+          title="Archive (hide from public)"
         >
           {isArchiving ? <Loader2 className="size-4 animate-spin" /> : <Archive className="size-4" />}
         </button>
@@ -245,7 +239,7 @@ function AppRow({ app, onDelete, onArchive, isDeleting, isArchiving }: {
         onClick={onDelete}
         disabled={isDeleting}
         className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-        title="Delete"
+        title="Delete permanently"
       >
         {isDeleting ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
       </button>
@@ -280,7 +274,6 @@ function AnalyticsView({ analytics, loading }: { analytics: AnalyticsData | unde
 
   const combinedSeries = useMemo(() => {
     if (!analytics) return new Array(30).fill(0);
-    // Build a 30-day date series
     const days: string[] = [];
     for (let i = 29; i >= 0; i--) {
       const d = new Date();
@@ -315,7 +308,6 @@ function AnalyticsView({ analytics, loading }: { analytics: AnalyticsData | unde
         </div>
       </div>
 
-      {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 mb-6">
         <div className="rounded-2xl bg-background/5 border border-background/10 p-5">
           <div className="text-xs text-background/60 font-semibold uppercase tracking-wider flex items-center gap-2">
@@ -331,19 +323,17 @@ function AnalyticsView({ analytics, loading }: { analytics: AnalyticsData | unde
         </div>
       </div>
 
-      {/* Chart */}
       <div className="rounded-2xl bg-background/5 border border-background/10 p-6 mb-6">
         <h3 className="font-display text-xl text-background mb-4">Daily visits</h3>
         {totalViews === 0 ? (
           <div className="text-background/40 text-sm py-8 text-center">
-            No traffic data yet. Visits will appear here as users discover your apps.
+            No traffic data yet. Visits appear here as users discover your apps.
           </div>
         ) : (
           <BigChart series={combinedSeries} />
         )}
       </div>
 
-      {/* Per-app table */}
       {apps.length > 0 && (
         <div className="rounded-2xl bg-background/5 border border-background/10 overflow-hidden">
           <div className="p-6">
@@ -424,12 +414,10 @@ function AdminDashboard({ user }: { user: { email: string; displayName?: string 
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const name = user.displayName?.split(" ")[0] ?? user.email.split("@")[0];
   const apps = allAppsPage?.items ?? [];
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
-      {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
           <div className="inline-flex items-center gap-2 rounded-full bg-destructive/10 text-destructive px-3 py-1 text-xs font-bold tracking-wide uppercase mb-2">
@@ -448,7 +436,6 @@ function AdminDashboard({ user }: { user: { email: string; displayName?: string 
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="mt-6 flex gap-1 border-b border-border">
         {(["apps", "users"] as const).map(t => (
           <button
@@ -468,10 +455,10 @@ function AdminDashboard({ user }: { user: { email: string; displayName?: string 
               <Loader2 className="size-5 animate-spin" /> Loading…
             </div>
           )}
-          {!allAppsLoading && apps.length === 0 && (
-            <div className="p-10 text-center text-muted-foreground">No apps found.</div>
-          )}
           <div className="bg-card border border-border rounded-3xl divide-y divide-border overflow-hidden">
+            {!allAppsLoading && apps.length === 0 && (
+              <div className="p-10 text-center text-muted-foreground">No apps found.</div>
+            )}
             {apps.map((app: AdminApp) => {
               const canArchive = ["PUBLISHED", "SUBMITTED", "IN_REVIEW", "APPROVED"].includes(app.status);
               return (
@@ -510,7 +497,7 @@ function AdminDashboard({ user }: { user: { email: string; displayName?: string 
                     </button>
                   )}
                   <button
-                    onClick={() => { if (confirm(`PERMANENTLY delete "${app.name}"? Cannot be undone.`)) deleteMutation.mutate(app.id); }}
+                    onClick={() => { if (confirm(`PERMANENTLY delete "${app.name}"? This cannot be undone.`)) deleteMutation.mutate(app.id); }}
                     disabled={deleteMutation.isPending && deleteMutation.variables === app.id}
                     className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
                     title="Delete permanently"
@@ -550,8 +537,9 @@ function UserManagementPanel() {
       });
       setResult({ ok: true, msg: `Done — ${data.email} is now ${data.role}` });
       toast.success(`Role updated for ${data.email}`);
-    } catch (e: any) {
-      setResult({ ok: false, msg: e?.message ?? "Failed to update role" });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to update role";
+      setResult({ ok: false, msg });
     } finally {
       setLoading(false);
     }
@@ -562,7 +550,7 @@ function UserManagementPanel() {
       <div className="bg-card border border-border rounded-3xl p-6">
         <h3 className="font-display text-xl mb-1">Set User Role</h3>
         <p className="text-sm text-muted-foreground mb-5">
-          Update any user's role. Use this to grant yourself ADMIN, promote moderators, or reset roles.
+          Grant or change any user's role. To promote yourself to ADMIN, enter your own email.
         </p>
         <div className="flex flex-wrap gap-3 items-end">
           <div className="flex-1 min-w-48">
@@ -605,17 +593,13 @@ function UserManagementPanel() {
         )}
       </div>
 
-      <div className="mt-4 bg-muted/30 border border-border rounded-3xl p-6">
-        <h3 className="font-semibold mb-2">Quick grant admin</h3>
-        <p className="text-sm text-muted-foreground mb-3">
-          To grant admin to <strong>idomena29@gmail.com</strong>, enter that email above and select ADMIN, then click Set Role.
+      <div className="mt-4 bg-amber-50 border border-amber-200 rounded-3xl p-6">
+        <h3 className="font-semibold text-amber-900 mb-1">Bootstrap Note</h3>
+        <p className="text-sm text-amber-800">
+          This panel only works if you already have ADMIN role. To grant yourself admin access for the first time,
+          go to <a href="https://api.imaginehq.services/admin-dashboard" target="_blank" rel="noopener noreferrer" className="underline font-medium">the server admin panel</a> and
+          use the "User Management" section there (requires the ADMIN_PANEL_SECRET from Railway variables).
         </p>
-        <button
-          onClick={() => { setEmail("idomena29@gmail.com"); setRole("ADMIN"); }}
-          className="text-sm text-foreground underline hover:no-underline"
-        >
-          Pre-fill idomena29@gmail.com
-        </button>
       </div>
     </div>
   );
@@ -667,3 +651,4 @@ function BigChart({ series }: { series: number[] }) {
     </div>
   );
 }
+
