@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Rocket, Trash2, ExternalLink, Plus, TrendingUp, Eye,
@@ -109,7 +109,6 @@ function UserPrompt() {
 // ── Creator Dashboard ────────────────────────────────────────────────────────
 
 function CreatorDashboard({ user }: { user: { displayName?: string | null; email: string } }) {
-  const [mode, setMode] = useState<"apps" | "analytics">("apps");
   const queryClient = useQueryClient();
 
   const { data: appsPage, isLoading: appsLoading } = useQuery({
@@ -120,15 +119,13 @@ function CreatorDashboard({ user }: { user: { displayName?: string | null; email
   const { data: analytics, isLoading: analyticsLoading } = useQuery({
     queryKey: ["mine-analytics"],
     queryFn: () => apiFetch<AnalyticsData>("/api/v1/apps/mine/analytics"),
-    enabled: mode === "analytics",
-    refetchInterval: mode === "analytics" ? 30_000 : false,
+    refetchInterval: 30_000,
   });
 
   const { data: liveData } = useQuery({
     queryKey: ["mine-live"],
     queryFn: () => apiFetch<LiveData>("/api/v1/apps/mine/live"),
-    enabled: mode === "analytics",
-    refetchInterval: mode === "analytics" ? 15_000 : false,
+    refetchInterval: 15_000,
   });
 
   const deleteMutation = useMutation({
@@ -155,60 +152,54 @@ function CreatorDashboard({ user }: { user: { displayName?: string | null; email
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:py-10">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
           <h1 className="font-display text-3xl sm:text-4xl">Welcome back, {name}</h1>
           <p className="text-muted-foreground mt-1 text-sm sm:text-base">Manage your apps and track performance.</p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={() => setMode(mode === "apps" ? "analytics" : "apps")}
-            className="inline-flex items-center gap-2 rounded-full border border-border px-3 sm:px-4 py-2 text-sm font-semibold hover:bg-muted/40 transition"
-          >
-            {mode === "apps" ? <><TrendingUp className="size-4" /> Analytics</> : <><Rocket className="size-4" /> Apps</>}
-          </button>
-          <Link to="/submit" className="inline-flex items-center gap-2 rounded-full bg-primary text-foreground px-4 sm:px-5 py-2 sm:py-2.5 text-sm font-semibold hover:-translate-y-0.5 transition">
-            <Plus className="size-4" /> New app
-          </Link>
-        </div>
+        <Link to="/submit" className="self-start inline-flex items-center gap-2 rounded-full bg-primary text-foreground px-4 sm:px-5 py-2 sm:py-2.5 text-sm font-semibold hover:-translate-y-0.5 transition">
+          <Plus className="size-4" /> New app
+        </Link>
       </div>
 
-      {mode === "apps" ? (
-        <>
-          <div className="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
-            <StatCard icon={<Rocket className="size-5" />} label="Apps" value={apps.length} tone="primary" />
-            <StatCard icon={<Eye className="size-5" />} label="Published" value={apps.filter(a => a.status === "PUBLISHED").length} tone="mint" />
-            <StatCard icon={<Activity className="size-5" />} label="In review" value={apps.filter(a => ["SUBMITTED", "IN_REVIEW", "APPROVED"].includes(a.status)).length} tone="default" />
-          </div>
+      {/* Analytics — always visible */}
+      <AnalyticsView analytics={analytics} loading={analyticsLoading} live={liveData} />
 
-          <h2 className="mt-10 font-display text-2xl">Your apps</h2>
-          <div className="mt-3 bg-card border border-border rounded-3xl divide-y divide-border overflow-hidden">
-            {appsLoading && (
-              <div className="p-10 text-center text-muted-foreground flex items-center justify-center gap-2">
-                <Loader2 className="size-4 animate-spin" /> Loading…
-              </div>
-            )}
-            {!appsLoading && apps.length === 0 && (
-              <div className="p-10 text-center text-muted-foreground">
-                <p>No apps yet.</p>
-                <Link to="/submit" className="mt-3 inline-block font-medium hover:underline">Submit your first app →</Link>
-              </div>
-            )}
-            {apps.map((app) => (
-              <AppRow
-                key={app.id}
-                app={app}
-                onDelete={() => { if (confirm(`Delete "${app.name}"?`)) deleteMutation.mutate(app.id); }}
-                onArchive={() => { if (confirm(`Archive "${app.name}"? It will be hidden from public listings.`)) archiveMutation.mutate(app.id); }}
-                isDeleting={deleteMutation.isPending && deleteMutation.variables === app.id}
-                isArchiving={archiveMutation.isPending && archiveMutation.variables === app.id}
-              />
-            ))}
+      {/* Apps list */}
+      <div className="mt-10">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-display text-2xl">Your apps</h2>
+          <div className="flex gap-2 text-xs text-muted-foreground">
+            <span>{apps.filter(a => a.status === "PUBLISHED").length} published</span>
+            <span>·</span>
+            <span>{apps.length} total</span>
           </div>
-        </>
-      ) : (
-        <AnalyticsView analytics={analytics} loading={analyticsLoading} live={liveData} />
-      )}
+        </div>
+        <div className="bg-card border border-border rounded-3xl divide-y divide-border overflow-hidden">
+          {appsLoading && (
+            <div className="p-10 text-center text-muted-foreground flex items-center justify-center gap-2">
+              <Loader2 className="size-4 animate-spin" /> Loading…
+            </div>
+          )}
+          {!appsLoading && apps.length === 0 && (
+            <div className="p-10 text-center text-muted-foreground">
+              <p>No apps yet.</p>
+              <Link to="/submit" className="mt-3 inline-block font-medium hover:underline">Submit your first app →</Link>
+            </div>
+          )}
+          {apps.map((app) => (
+            <AppRow
+              key={app.id}
+              app={app}
+              onDelete={() => { if (confirm(`Delete "${app.name}"?`)) deleteMutation.mutate(app.id); }}
+              onArchive={() => { if (confirm(`Archive "${app.name}"? It will be hidden from public listings.`)) archiveMutation.mutate(app.id); }}
+              isDeleting={deleteMutation.isPending && deleteMutation.variables === app.id}
+              isArchiving={archiveMutation.isPending && archiveMutation.variables === app.id}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
