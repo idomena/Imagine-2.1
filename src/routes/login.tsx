@@ -142,16 +142,12 @@ function LoginPage() {
             </button>
           </div>
 
-          {import.meta.env.VITE_GOOGLE_CLIENT_ID && (
-            <>
-              <div ref={googleBtnRef} className="w-full flex justify-center" />
-              <div className="flex items-center gap-3 my-2">
-                <div className="h-px flex-1 bg-border" />
-                <span className="text-xs text-muted-foreground font-medium">or</span>
-                <div className="h-px flex-1 bg-border" />
-              </div>
-            </>
-          )}
+          <div ref={googleBtnRef} className="w-full flex justify-center min-h-[44px]" />
+          <div className="flex items-center gap-3 my-1">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs text-muted-foreground font-medium">or</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
 
           <form className="space-y-3" onSubmit={handleSubmit}>
             {mode === "signup" && (
