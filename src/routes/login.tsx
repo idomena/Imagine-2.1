@@ -142,7 +142,13 @@ function LoginPage() {
             </button>
           </div>
 
-          <div ref={googleBtnRef} className="w-full flex justify-center min-h-[44px]" />
+          {import.meta.env.VITE_GOOGLE_CLIENT_ID ? (
+            <div ref={googleBtnRef} className="w-full flex justify-center min-h-[44px]" />
+          ) : (
+            <div className="text-[11px] text-muted-foreground text-center bg-background/50 border border-border rounded-xl px-3 py-2">
+              Google sign-in disabled — set <code>VITE_GOOGLE_CLIENT_ID</code> to enable.
+            </div>
+          )}
           <div className="flex items-center gap-3 my-1">
             <div className="h-px flex-1 bg-border" />
             <span className="text-xs text-muted-foreground font-medium">or</span>
