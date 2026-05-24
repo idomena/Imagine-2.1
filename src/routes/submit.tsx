@@ -111,7 +111,7 @@ function SubmitPage() {
       });
 
       // Step 2: submit for review/auto-publish
-      await apiFetch(`/api/v1/apps/${created.id}/submit`, { method: "POST" });
+      await apiFetch(`/api/v1/apps/${created.id}/submit`, { method: "POST", body: {} });
 
       toast.success("Your tool is live! 🚀");
       navigate({ to: "/dashboard" });
