@@ -1,49 +1,96 @@
 ## Goal
+Connect the existing design to your own backend only, fix Google login, and make the Analytics dashboard use live backend data instead of generated demo numbers.
 
-Connect the existing Login, Welcome Back, and signup screens to your backend at `https://api.imaginehq.services` using JWT (access + refresh tokens).
+## Current problem
+- The screenshot warning `GOOGLE_WEB_RISK_API_KEY is not set` is not the Google login issue. It only disables URL threat scanning in your backend.
+- The frontend is configured for `https://api.imaginehq.services`, but that public domain currently returns Railway's `Application not found`. So the Lovable preview cannot reach your backend yet.
+- The Analytics dashboard currently generates fake chart/activity/source data from local demo tools.
 
-## What I'll build
+## Plan
 
-### 1. API client (`src/lib/api.ts`)
-- Base URL: `https://api.imaginehq.services`
-- `apiFetch(path, options)` helper that:
-  - Adds `Authorization: Bearer <accessToken>` from storage
-  - Parses the `{ success, data }` envelope your API returns
-  - On 401, tries `POST /api/v1/auth/refresh` once with the refresh token; if that fails, clears tokens and redirects to `/login`
+### 1. Keep the frontend pointed at your backend
+- Keep `VITE_API_URL=https://api.imaginehq.services` as the production API base.
+- Add clearer frontend error handling when the backend is unreachable, so the app shows a useful message instead of empty/fake data.
 
-### 2. Auth module (`src/lib/auth.ts`)
-- `login(email, password)` → `POST /api/v1/auth/login`
-- `register(email, password, displayName?)` → `POST /api/v1/auth/register`
-- `logout()` → clears tokens (and calls `/api/v1/auth/logout` if it exists)
-- Stores `accessToken`, `refreshToken`, and `user` in `localStorage`
-- Exposes a small subscribe API so the app reacts to auth changes
+### 2. Fix Google login flow in the frontend
+- Keep the standard secure flow: frontend gets the Google credential, backend verifies it, backend returns your app JWT.
+- Keep calling your backend endpoint `POST /api/v1/auth/google`.
+- Improve the Google button loading/error handling so the login page clearly shows if:
+  - Google client id is missing.
+  - Google SDK did not load.
+  - Backend `/api/v1/auth/google` is unreachable or rejects the credential.
 
-### 3. React auth context (`src/contexts/AuthContext.tsx`)
-- `useAuth()` hook returning `{ user, isAuthenticated, login, register, logout, loading }`
-- Provider wraps the app in `__root.tsx`
+### 3. Make Analytics live
+- Add a typed analytics API hook that calls your backend with the user's JWT.
+- Expected endpoint shape, unless your backend already differs:
 
-### 4. Wire up existing screens
-- `src/routes/login.tsx` → call `login()` on submit, show errors from API, redirect to `/dashboard` on success
-- `src/routes/welcome-back.tsx` → same login flow (existing returning-user screen)
-- A signup form (use the existing Info/welcome screen or add to login) → call `register()`
-- Header: show user email + Logout when authenticated; show Login when not
+```text
+GET /api/v1/analytics/overview?range=30d
+Authorization: Bearer <accessToken>
 
-### 5. Route guard
-- Create `src/routes/_authenticated.tsx` pathless layout that redirects to `/login` if not authenticated
-- (Optional later) move `dashboard.tsx` under `_authenticated/` when you want it protected — leaving routes public for now since you said scope is just auth
+Response:
+{
+  "success": true,
+  "data": {
+    "range": "30d",
+    "totals": {
+      "views": 1234,
+      "clicks": 240,
+      "ctr": 19.4,
+      "conversations": 12,
+      "uniqueVisitors": 600,
+      "liveVisitors": 4
+    },
+    "series": [12, 18, 22],
+    "sources": [
+      { "name": "Imagine", "value": 42 }
+    ],
+    "countries": [
+      { "flag": "🇺🇸", "name": "United States", "pct": 38 }
+    ],
+    "tools": [
+      {
+        "id": "uuid",
+        "name": "Tool name",
+        "domain": "example.com",
+        "url": "https://example.com",
+        "iconUrl": null,
+        "primaryColor": null,
+        "views": 500,
+        "clicks": 100,
+        "ctr": 20,
+        "trend": 8.5,
+        "series": [5, 8, 13]
+      }
+    ],
+    "realtime": [
+      { "toolName": "Tool name", "page": "/", "country": "🇺🇸 US", "time": "12s" }
+    ]
+  }
+}
+```
 
-## Things to confirm / assumptions
+### 4. Replace fake dashboard calculations
+- Replace the seeded random chart data in `src/routes/dashboard.tsx` with data from the analytics hook.
+- Add loading, error, empty, and unauthorized states.
+- Keep the existing visual design and layout; only swap the data source.
 
-- **CORS**: your backend must allow `https://*.lovable.app` (and your custom domain later) with `Authorization` header. If it doesn't, login will fail with a CORS error in the browser console — you'll need to whitelist origins on the backend.
-- **Refresh endpoint**: I'll assume `POST /api/v1/auth/refresh` with `{ refreshToken }` returning a new `accessToken`. If the path or shape differs, tell me and I'll adjust.
-- **Token storage**: `localStorage` (simple, works with JWT in Authorization header). If you'd prefer httpOnly cookies, the backend would need to set them and we'd switch to `credentials: 'include'`.
-- **No secrets in frontend**: confirmed public API, so no server-side proxy needed.
+### 5. Backend actions you need outside Lovable
+- Deploy or reconnect the Railway service so `https://api.imaginehq.services` points to the running backend.
+- Add CORS for:
+  - `https://*.lovable.app`
+  - `https://*.lovableproject.com`
+  - your final custom domain
+- Allow headers: `Content-Type, Authorization`.
+- Make sure `POST /api/v1/auth/google` and `GET /api/v1/analytics/overview` exist on the backend.
 
-## Out of scope (for this step)
+## Files to change after approval
+- `src/lib/auth.ts`
+- `src/routes/login.tsx`
+- `src/hooks/use-analytics.ts` new
+- `src/routes/dashboard.tsx`
 
-- Email verification flow
-- Password reset
-- Protecting specific routes (can do after auth works)
-- Avatar upload, profile editing
-
-Ready to build when you approve.
+## What will not be changed
+- No Lovable Cloud backend.
+- No Supabase auth.
+- No mock Analytics pretending to be live.

@@ -115,7 +115,16 @@ async function rawFetch<T>(path: string, opts: ApiFetchOptions = {}): Promise<T>
     body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
   };
 
-  const res = await fetch(`${API_BASE_URL}${path}`, init);
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, init);
+  } catch (e) {
+    throw new ApiError(
+      "Can't reach the server. Check your connection or try again in a moment.",
+      0,
+      { cause: e instanceof Error ? e.message : String(e) },
+    );
+  }
 
   let payload: any = null;
   const text = await res.text();
