@@ -289,8 +289,8 @@ function UrlPasteBar() {
 
   return (
     <div className="relative mx-auto max-w-xl w-full mt-10 sm:mt-20">
-      {/* Cozy hand-drawn pointer — hidden on very small screens to avoid clipping */}
-      <div className="pointer-events-none hidden xs:flex absolute -top-14 left-2 sm:-left-6 flex-col items-start animate-wiggle-point text-foreground">
+      {/* Cozy hand-drawn pointer */}
+      <div className="pointer-events-none absolute -top-14 left-2 sm:-left-6 flex flex-col items-start animate-wiggle-point text-foreground">
         <span className="font-serif-italic italic text-sm sm:text-base leading-none whitespace-nowrap">
           psst… drop your link here
         </span>
