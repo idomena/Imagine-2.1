@@ -1,11 +1,17 @@
-import { Link, useRouterState } from "@tanstack/react-router";
-import { Compass, TrendingUp, Plus, BarChart3, User as UserIcon } from "lucide-react";
+import { Link, useRouter, useRouterState } from "@tanstack/react-router";
+import { Compass, TrendingUp, Plus, BarChart3, User as UserIcon, LogIn, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 export function MobileNav() {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
+  const router = useRouter();
   const is = (p: string) => pathname === p;
+
+  const handleLogout = async () => {
+    await logout();
+    router.navigate({ to: "/" });
+  };
 
   const avatarEl = isAuthenticated && user ? (
     user.avatarUrl
@@ -45,12 +51,31 @@ export function MobileNav() {
         </div>
 
         <Item to="/dashboard" active={is("/dashboard")} icon={<BarChart3 className="size-5" />} label="Dashboard" />
-        <Item
-          to="/dashboard"
-          active={pathname.startsWith("/u/")}
-          icon={avatarEl}
-          label="You"
-        />
+
+        {isAuthenticated ? (
+          <div className="flex flex-col items-center gap-0.5 py-2 relative">
+            {pathname.startsWith("/u/") || is("/dashboard") ? (
+              <span className="absolute -top-0.5 left-1/2 -translate-x-1/2 h-1 w-8 rounded-full bg-primary" />
+            ) : null}
+            <Link
+              to="/dashboard"
+              className="flex flex-col items-center gap-0.5 text-[10px] font-semibold tracking-wide transition text-foreground/55 hover:text-foreground"
+            >
+              {avatarEl}
+              <span>You</span>
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="absolute -top-1 -right-1 grid place-items-center size-5 rounded-full bg-card border border-border text-foreground/60 hover:text-foreground transition"
+              title="Log out"
+              aria-label="Log out"
+            >
+              <LogOut className="size-3" />
+            </button>
+          </div>
+        ) : (
+          <Item to="/login" active={is("/login")} icon={<LogIn className="size-5" />} label="Log in" />
+        )}
       </div>
     </nav>
   );
