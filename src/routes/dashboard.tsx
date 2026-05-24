@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Rocket, Trash2, ExternalLink, Plus, TrendingUp, Eye,
@@ -109,6 +109,7 @@ function UserPrompt() {
 // ── Creator Dashboard ────────────────────────────────────────────────────────
 
 function CreatorDashboard({ user }: { user: { displayName?: string | null; email: string } }) {
+  const [mode, setMode] = useState<"apps" | "analytics">("analytics");
   const queryClient = useQueryClient();
 
   const { data: appsPage, isLoading: appsLoading } = useQuery({
@@ -153,53 +154,77 @@ function CreatorDashboard({ user }: { user: { displayName?: string | null; email
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:py-10">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
-          <h1 className="font-display text-3xl sm:text-4xl">Welcome back, {name}</h1>
-          <p className="text-muted-foreground mt-1 text-sm sm:text-base">Manage your apps and track performance.</p>
+          <p className="text-sm text-muted-foreground font-medium">
+            {apps.length} app{apps.length !== 1 ? "s" : ""} tracked
+          </p>
+          <h1 className="font-display text-3xl sm:text-4xl mt-0.5">
+            Hey {name}, here's how it's going.
+          </h1>
         </div>
-        <Link to="/submit" className="self-start inline-flex items-center gap-2 rounded-full bg-primary text-foreground px-4 sm:px-5 py-2 sm:py-2.5 text-sm font-semibold hover:-translate-y-0.5 transition">
-          <Plus className="size-4" /> New app
-        </Link>
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Mode toggle pill */}
+          <div className="flex items-center gap-1 bg-card border border-border rounded-full p-1">
+            <button
+              onClick={() => setMode("analytics")}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all ${
+                mode === "analytics"
+                  ? "bg-primary text-foreground shadow-sm"
+                  : "text-foreground/55 hover:text-foreground"
+              }`}
+            >
+              <TrendingUp className="size-3.5" /> Analytics
+            </button>
+            <button
+              onClick={() => setMode("apps")}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all ${
+                mode === "apps"
+                  ? "bg-primary text-foreground shadow-sm"
+                  : "text-foreground/55 hover:text-foreground"
+              }`}
+            >
+              <Rocket className="size-3.5" /> Apps
+            </button>
+          </div>
+          <Link
+            to="/submit"
+            className="inline-flex items-center gap-1.5 rounded-full bg-foreground text-background px-4 py-2 text-sm font-semibold hover:-translate-y-0.5 transition"
+          >
+            <Plus className="size-3.5" /> New app
+          </Link>
+        </div>
       </div>
 
-      {/* Analytics — always visible */}
-      <AnalyticsView analytics={analytics} loading={analyticsLoading} live={liveData} />
-
-      {/* Apps list */}
-      <div className="mt-10">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="font-display text-2xl">Your apps</h2>
-          <div className="flex gap-2 text-xs text-muted-foreground">
-            <span>{apps.filter(a => a.status === "PUBLISHED").length} published</span>
-            <span>·</span>
-            <span>{apps.length} total</span>
+      {mode === "analytics" ? (
+        <AnalyticsView analytics={analytics} loading={analyticsLoading} live={liveData} />
+      ) : (
+        <div className="mt-8">
+          <div className="bg-card border border-border rounded-3xl divide-y divide-border overflow-hidden">
+            {appsLoading && (
+              <div className="p-10 text-center text-muted-foreground flex items-center justify-center gap-2">
+                <Loader2 className="size-4 animate-spin" /> Loading…
+              </div>
+            )}
+            {!appsLoading && apps.length === 0 && (
+              <div className="p-10 text-center text-muted-foreground">
+                <p>No apps yet.</p>
+                <Link to="/submit" className="mt-3 inline-block font-medium hover:underline">Submit your first app →</Link>
+              </div>
+            )}
+            {apps.map((app) => (
+              <AppRow
+                key={app.id}
+                app={app}
+                onDelete={() => { if (confirm(`Delete "${app.name}"?`)) deleteMutation.mutate(app.id); }}
+                onArchive={() => { if (confirm(`Archive "${app.name}"? It will be hidden from public listings.`)) archiveMutation.mutate(app.id); }}
+                isDeleting={deleteMutation.isPending && deleteMutation.variables === app.id}
+                isArchiving={archiveMutation.isPending && archiveMutation.variables === app.id}
+              />
+            ))}
           </div>
         </div>
-        <div className="bg-card border border-border rounded-3xl divide-y divide-border overflow-hidden">
-          {appsLoading && (
-            <div className="p-10 text-center text-muted-foreground flex items-center justify-center gap-2">
-              <Loader2 className="size-4 animate-spin" /> Loading…
-            </div>
-          )}
-          {!appsLoading && apps.length === 0 && (
-            <div className="p-10 text-center text-muted-foreground">
-              <p>No apps yet.</p>
-              <Link to="/submit" className="mt-3 inline-block font-medium hover:underline">Submit your first app →</Link>
-            </div>
-          )}
-          {apps.map((app) => (
-            <AppRow
-              key={app.id}
-              app={app}
-              onDelete={() => { if (confirm(`Delete "${app.name}"?`)) deleteMutation.mutate(app.id); }}
-              onArchive={() => { if (confirm(`Archive "${app.name}"? It will be hidden from public listings.`)) archiveMutation.mutate(app.id); }}
-              isDeleting={deleteMutation.isPending && deleteMutation.variables === app.id}
-              isArchiving={archiveMutation.isPending && archiveMutation.variables === app.id}
-            />
-          ))}
-        </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -276,27 +301,38 @@ function StatusBadge({ status }: { status: string }) {
 
 // ── Analytics View ───────────────────────────────────────────────────────────
 
+const PERIODS = [
+  { label: "7d",  days: 7  },
+  { label: "30d", days: 30 },
+] as const;
+type Period = typeof PERIODS[number]["label"];
+
 function AnalyticsView({ analytics, loading, live }: { analytics: AnalyticsData | undefined; loading: boolean; live?: LiveData }) {
+  const [period, setPeriod] = useState<Period>("30d");
+  const periodDays = PERIODS.find(p => p.label === period)!.days;
+
   const totalViews = useMemo(() =>
     analytics ? Object.values(analytics.totals).reduce((a, b) => a + b, 0) : 0,
     [analytics]
   );
 
   const combinedSeries = useMemo(() => {
-    if (!analytics) return new Array(30).fill(0);
     const days: string[] = [];
-    for (let i = 29; i >= 0; i--) {
+    for (let i = periodDays - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
       days.push(d.toISOString().slice(0, 10));
     }
+    if (!analytics) return days.map(() => 0);
     return days.map(date =>
       Object.values(analytics.byApp).reduce((sum, series) => {
         const row = series.find(s => s.date === date);
         return sum + (row?.views ?? 0);
       }, 0)
     );
-  }, [analytics]);
+  }, [analytics, periodDays]);
+
+  const periodViews = combinedSeries.reduce((a, b) => a + b, 0);
 
   if (loading) return (
     <div className="mt-10 flex items-center justify-center gap-2 text-muted-foreground py-20">
@@ -306,123 +342,147 @@ function AnalyticsView({ analytics, loading, live }: { analytics: AnalyticsData 
 
   const apps = analytics?.apps ?? [];
   const totals = analytics?.totals ?? {};
+  const maxTotal = Math.max(...apps.map(a => totals[a.id] ?? 0), 1);
 
   return (
-    <div className="bg-foreground text-background -mx-4 px-4 py-10 mt-6 rounded-3xl">
-      <div className="flex items-center justify-between flex-wrap gap-4 mb-8">
-        <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-mint/15 text-mint px-3 py-1 text-xs font-bold tracking-wide uppercase">
-            <Activity className="size-3.5" /> Live analytics · Last 30 days
-          </div>
-          <h2 className="mt-3 font-display text-4xl text-background">Traffic overview</h2>
-        </div>
+    <div className="mt-8 space-y-4">
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatCard icon={<Eye className="size-5" />} label="Total views" value={totalViews} tone="mint" />
+        <StatCard icon={<Activity className="size-5" />} label="Last 30 days" value={periodViews} tone="primary" />
+        <StatCard icon={<Rocket className="size-5" />} label="Apps live" value={apps.filter(a => a.status === "PUBLISHED").length} tone="default" />
+        <StatCard
+          icon={
+            <span className="relative flex size-2.5">
+              <span className="absolute inset-0 rounded-full bg-mint animate-ping opacity-75" />
+              <span className="relative rounded-full bg-mint size-2.5" />
+            </span>
+          }
+          label="Live now"
+          value={live?.activeCount ?? 0}
+          tone="default"
+        />
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        <div className="rounded-2xl bg-background/5 border border-background/10 p-5">
-          <div className="text-xs text-background/60 font-semibold uppercase tracking-wider flex items-center gap-2">
-            <Eye className="size-4 text-mint" /> Total views
+      {/* Traffic chart */}
+      <div className="bg-card border border-border rounded-3xl p-5 sm:p-6">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h3 className="font-display text-xl">Traffic</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Daily visits across all tools</p>
           </div>
-          <div className="mt-2 font-display text-4xl text-background">{totalViews.toLocaleString()}</div>
-        </div>
-        <div className="rounded-2xl bg-background/5 border border-background/10 p-5">
-          <div className="text-xs text-background/60 font-semibold uppercase tracking-wider flex items-center gap-2">
-            <Rocket className="size-4 text-mint" /> Apps tracked
+          <div className="flex items-center gap-1 bg-muted rounded-full p-1">
+            {PERIODS.map(p => (
+              <button
+                key={p.label}
+                onClick={() => setPeriod(p.label)}
+                className={`px-3 py-1 rounded-full text-xs font-semibold transition ${
+                  period === p.label
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
           </div>
-          <div className="mt-2 font-display text-4xl text-background">{apps.length}</div>
         </div>
-      </div>
-
-      <div className="rounded-2xl bg-background/5 border border-background/10 p-6 mb-6">
-        <h3 className="font-display text-xl text-background mb-4">Daily visits</h3>
-        {totalViews === 0 ? (
-          <div className="text-background/40 text-sm py-8 text-center">
-            No traffic data yet. Visits appear here as users discover your apps.
+        {periodViews === 0 ? (
+          <div className="text-muted-foreground text-sm py-10 text-center">
+            No traffic yet. Visits appear here as users discover your apps.
           </div>
         ) : (
           <BigChart series={combinedSeries} />
         )}
       </div>
 
-      {apps.length > 0 && (
-        <div className="rounded-2xl bg-background/5 border border-background/10 overflow-hidden">
-          <div className="p-6">
-            <h3 className="font-display text-xl text-background">Per-app performance</h3>
+      {/* Tool performance + Live feed side by side on desktop */}
+      <div className="grid sm:grid-cols-[1fr,320px] gap-4">
+        {/* Tool performance */}
+        <div className="bg-card border border-border rounded-3xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+            <h3 className="font-display text-lg">Tool performance</h3>
+            <span className="text-xs text-muted-foreground">Click to view public page</span>
           </div>
-          <table className="w-full text-sm">
-            <thead className="text-[10px] uppercase tracking-wider text-background/50 border-y border-background/10">
-              <tr>
-                <th className="text-left px-6 py-3">App</th>
-                <th className="text-right px-6 py-3">Views (30d)</th>
-                <th className="text-right px-6 py-3">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {apps.map(app => (
-                <tr key={app.id} className="border-t border-background/10 hover:bg-background/5 transition">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="size-9 rounded-xl bg-background/10 grid place-items-center shrink-0">
-                        {app.iconUrl
-                          ? <img src={app.iconUrl} className="size-5 rounded" alt="" />
-                          : <Rocket className="size-4 text-background/40" />}
+          {apps.length === 0 ? (
+            <div className="px-5 py-10 text-center text-muted-foreground text-sm">No apps tracked yet.</div>
+          ) : (
+            <div className="divide-y divide-border">
+              {apps.map(app => {
+                const views = totals[app.id] ?? 0;
+                const pct = Math.round((views / maxTotal) * 100);
+                return (
+                  <div key={app.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-muted/40 transition group">
+                    <div className="size-9 rounded-xl bg-muted grid place-items-center shrink-0 overflow-hidden">
+                      {app.iconUrl
+                        ? <img src={app.iconUrl} className="size-5 rounded" alt="" />
+                        : <Rocket className="size-4 text-muted-foreground" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className="font-semibold text-sm truncate">{app.name}</span>
+                        <span className="text-sm tabular-nums text-muted-foreground shrink-0">{views.toLocaleString()}</span>
                       </div>
-                      <div>
-                        <div className="font-semibold text-background">{app.name}</div>
-                        <div className="text-xs text-background/40">{app.slug}</div>
+                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-mint transition-all duration-500"
+                          style={{ width: `${pct}%` }}
+                        />
                       </div>
                     </div>
-                  </td>
-                  <td className="px-6 py-4 text-right text-background tabular-nums">
-                    {(totals[app.id] ?? 0).toLocaleString()}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <span className="text-[10px] font-bold text-background/60">{app.status}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    {app.launchUrl && (
+                      <a
+                        href={app.launchUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="shrink-0 opacity-0 group-hover:opacity-100 transition text-muted-foreground hover:text-foreground"
+                      >
+                        <ExternalLink className="size-3.5" />
+                      </a>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
-      )}
 
-      {/* Live feed */}
-      <div className="mt-3 rounded-2xl bg-background/5 border border-background/10 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <span className="relative flex size-2.5">
-              <span className="absolute inset-0 rounded-full bg-mint animate-ping opacity-60" />
-              <span className="relative rounded-full bg-mint size-2.5" />
+        {/* Live feed */}
+        <div className="bg-card border border-border rounded-3xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="relative flex size-2">
+                <span className="absolute inset-0 rounded-full bg-mint animate-ping opacity-60" />
+                <span className="relative rounded-full bg-mint size-2" />
+              </span>
+              <h3 className="font-display text-lg">Live now</h3>
+            </div>
+            <span className="text-xs text-muted-foreground flex items-center gap-1">
+              <Radio className="size-3" /> 15s
             </span>
-            <h3 className="font-display text-xl text-background">Live now</h3>
-            <span className="text-background/50 text-sm">· {live?.activeCount ?? 0} visits in last 5 min</span>
           </div>
-          <div className="flex items-center gap-1 text-xs text-background/40">
-            <Radio className="size-3" /> auto-refresh 15s
-          </div>
+          {!live || live.recentEvents.length === 0 ? (
+            <div className="px-5 py-10 text-center text-muted-foreground text-sm">No visitors in the last 5 minutes.</div>
+          ) : (
+            <div className="divide-y divide-border">
+              {live.recentEvents.map(ev => (
+                <div key={ev.id} className="flex items-center gap-3 px-5 py-3">
+                  <div className="size-7 rounded-lg bg-muted grid place-items-center shrink-0 overflow-hidden">
+                    {ev.app.iconUrl
+                      ? <img src={ev.app.iconUrl} className="size-4 rounded" alt="" />
+                      : <Rocket className="size-3.5 text-muted-foreground" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-semibold truncate block">{ev.app.name}</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                    {timeAgo(ev.createdAt)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-        {!live || live.recentEvents.length === 0 ? (
-          <p className="text-background/40 text-sm py-4 text-center">No visits yet in the last 5 minutes.</p>
-        ) : (
-          <div className="space-y-2">
-            {live.recentEvents.map(ev => (
-              <div key={ev.id} className="flex items-center gap-3 py-2 border-b border-background/5 last:border-0">
-                <div className="size-7 rounded-lg bg-background/10 grid place-items-center shrink-0 overflow-hidden">
-                  {ev.app.iconUrl
-                    ? <img src={ev.app.iconUrl} className="size-5 rounded" alt="" />
-                    : <Rocket className="size-3.5 text-background/40" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className="text-background/60 text-sm">visited </span>
-                  <span className="text-background text-sm font-semibold">{ev.app.name}</span>
-                </div>
-                <span className="text-xs text-background/30 tabular-nums shrink-0">
-                  {timeAgo(ev.createdAt)}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
