@@ -1,18 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { useApps } from "@/hooks/use-apps";
 import { useStore } from "@/lib/store";
 import { ToolCard } from "@/components/ToolCard";
-import { Flame, Clock, ArrowUp } from "lucide-react";
+import { Flame, Clock, ArrowUp, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/trending")({
   component: Trending,
 });
 
 function Trending() {
-  const { tools } = useStore();
+  const { tools, isLoading } = useApps();
+  const { upvoted } = useStore();
+  const toolsWithUpvotes = tools.map((t) => ({
+    ...t,
+    upvotes: upvoted.has(t.id) ? t.upvotes + 1 : t.upvotes,
+  }));
   const [sort, setSort] = useState<"top" | "new">("top");
 
-  const sorted = [...tools].sort((a, b) =>
+  const sorted = [...toolsWithUpvotes].sort((a, b) =>
     sort === "top" ? b.upvotes - a.upvotes : b.createdAt - a.createdAt,
   );
 
@@ -23,7 +29,7 @@ function Trending() {
           <h1 className="font-display font-bold text-3xl flex items-center gap-2">
             <Flame className="size-7 text-primary" /> Trending in the yard
           </h1>
-          <p className="text-muted-foreground mt-1">The tools makers can't stop talking about.</p>
+          <p className="text-muted-foreground mt-1">The apps makers can&apos;t stop talking about.</p>
         </div>
         <div className="flex gap-1 bg-muted rounded-lg p-1">
           <Tab active={sort === "top"} onClick={() => setSort("top")}><ArrowUp className="size-3.5" /> Top</Tab>
@@ -31,9 +37,15 @@ function Trending() {
         </div>
       </div>
 
-      <div className="mt-6 space-y-3">
-        {sorted.map((t, i) => <ToolCard key={t.id} tool={t} rank={sort === "top" ? i + 1 : undefined} />)}
-      </div>
+      {isLoading ? (
+        <div className="flex justify-center py-16">
+          <Loader2 className="size-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : (
+        <div className="mt-6 space-y-3">
+          {sorted.map((t, i) => <ToolCard key={t.id} tool={t} rank={sort === "top" ? i + 1 : undefined} />)}
+        </div>
+      )}
     </div>
   );
 }

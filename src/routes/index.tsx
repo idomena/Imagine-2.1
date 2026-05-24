@@ -2,7 +2,8 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Sparkles, TrendingUp, Rocket, Users, Link2, Heart, RotateCcw, ShieldCheck, Loader2 } from "lucide-react";
 
-import { useStore, CATEGORIES } from "@/lib/store";
+import { useStore } from "@/lib/store";
+import { useApps, useCategories } from "@/hooks/use-apps";
 import { ToolCard } from "@/components/ToolCard";
 import { CloudsBackground } from "@/components/CloudsBackground";
 
@@ -11,22 +12,31 @@ export const Route = createFileRoute("/")({
 });
 
 function Home() {
-  const { tools } = useStore();
+  const { tools, isLoading } = useApps();
+  const { data: apiCategories } = useCategories();
+  const { upvoted } = useStore();
   const [cat, setCat] = useState("All");
   const [q, setQ] = useState("");
 
+  const categories = ["All", ...(apiCategories ?? []).map((c) => c.name)];
+
+  const toolsWithUpvotes = tools.map((t) => ({
+    ...t,
+    upvotes: upvoted.has(t.id) ? t.upvotes + 1 : t.upvotes,
+  }));
+
   const filtered = useMemo(() => {
-    return tools
-      .filter((t) => cat === "All" || t.category === cat || t.tags.includes(cat))
+    return toolsWithUpvotes
+      .filter((t) => cat === "All" || t.category === cat)
       .filter((t) =>
         q.trim() === ""
           ? true
-          : (t.name + t.tagline + t.description + t.tags.join(" ")).toLowerCase().includes(q.toLowerCase()),
+          : (t.name + t.tagline + t.description).toLowerCase().includes(q.toLowerCase()),
       )
       .sort((a, b) => b.upvotes - a.upvotes);
-  }, [tools, cat, q]);
+  }, [toolsWithUpvotes, cat, q]);
 
-  const topThree = [...tools].sort((a, b) => b.upvotes - a.upvotes).slice(0, 3);
+  const topThree = [...toolsWithUpvotes].sort((a, b) => b.upvotes - a.upvotes).slice(0, 3);
 
   return (
     <div>
@@ -75,9 +85,9 @@ function Home() {
           </div>
 
           <div className="mt-10 flex items-center justify-center gap-7 text-sm text-foreground/60 flex-wrap">
-            <Stat icon={<Rocket className="size-4" />} label={`${tools.length} tools live`} />
-            <Stat icon={<Users className="size-4" />} label="4 cozy makers" />
-            <Stat icon={<Heart className="size-4" />} label={`${tools.reduce((a, t) => a + t.upvotes, 0)} upvotes given`} />
+            <Stat icon={<Rocket className="size-4" />} label={`${tools.length} apps live`} />
+            <Stat icon={<Users className="size-4" />} label="indie makers" />
+            <Stat icon={<Heart className="size-4" />} label={`${upvoted.size} upvotes given`} />
           </div>
         </div>
       </section>
@@ -116,7 +126,7 @@ function Home() {
         </div>
 
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2 -mx-4 px-4">
-          {CATEGORIES.map((c) => (
+          {categories.map((c) => (
             <button
               key={c}
               onClick={() => setCat(c)}
@@ -131,15 +141,23 @@ function Home() {
           ))}
         </div>
 
-        <div className="grid md:grid-cols-2 gap-4">
-          {filtered.map((t) => (
-            <ToolCard key={t.id} tool={t} />
-          ))}
-        </div>
-        {filtered.length === 0 && (
-          <div className="text-center py-16 text-muted-foreground">
-            No tools match. Why not <Link to="/submit" className="text-mint font-medium underline">submit one</Link>?
+        {isLoading ? (
+          <div className="flex justify-center py-16">
+            <Loader2 className="size-8 animate-spin text-muted-foreground" />
           </div>
+        ) : (
+          <>
+            <div className="grid md:grid-cols-2 gap-4">
+              {filtered.map((t) => (
+                <ToolCard key={t.id} tool={t} />
+              ))}
+            </div>
+            {filtered.length === 0 && (
+              <div className="text-center py-16 text-muted-foreground">
+                No apps here yet. Why not <Link to="/submit" className="text-mint font-medium underline">submit one</Link>?
+              </div>
+            )}
+          </>
         )}
       </section>
 

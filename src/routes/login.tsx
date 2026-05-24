@@ -1,8 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Mail, Lock, Rocket, User as UserIcon, Eye, EyeOff, Loader2 } from "lucide-react";
 import { CloudsBackground } from "@/components/CloudsBackground";
 import { useAuth } from "@/contexts/AuthContext";
+import { loginWithGoogle } from "@/lib/auth";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
@@ -26,6 +27,49 @@ function LoginPage() {
 
   const { login, register } = useAuth();
   const navigate = useNavigate();
+  const googleBtnRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (!clientId) return;
+
+    const initGoogle = () => {
+      const g = (window as any).google;
+      if (!g?.accounts?.id) return;
+      g.accounts.id.initialize({
+        client_id: clientId,
+        callback: async (response: { credential: string }) => {
+          setError(null);
+          try {
+            await loginWithGoogle(response.credential);
+            toast.success("Welcome to Imagine!");
+            navigate({ to: "/dashboard" });
+          } catch (err: any) {
+            setError(err?.message ?? "Google sign-in failed. Please try again.");
+          }
+        },
+      });
+      if (googleBtnRef.current) {
+        g.accounts.id.renderButton(googleBtnRef.current, {
+          type: "standard",
+          shape: "pill",
+          theme: "outline",
+          text: "continue_with",
+          size: "large",
+          width: googleBtnRef.current.offsetWidth || 360,
+          locale: "en",
+        });
+      }
+    };
+
+    if ((window as any).google?.accounts?.id) {
+      initGoogle();
+    } else {
+      window.addEventListener("google-loaded", initGoogle, { once: true });
+      const script = document.querySelector('script[src*="accounts.google.com/gsi/client"]');
+      if (script) script.addEventListener("load", initGoogle, { once: true });
+    }
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -97,6 +141,17 @@ function LoginPage() {
               Sign up
             </button>
           </div>
+
+          {import.meta.env.VITE_GOOGLE_CLIENT_ID && (
+            <>
+              <div ref={googleBtnRef} className="w-full flex justify-center" />
+              <div className="flex items-center gap-3 my-2">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-xs text-muted-foreground font-medium">or</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+            </>
+          )}
 
           <form className="space-y-3" onSubmit={handleSubmit}>
             {mode === "signup" && (
