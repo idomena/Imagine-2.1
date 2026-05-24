@@ -3,8 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Rocket, Trash2, ExternalLink, Plus, TrendingUp, Eye,
-  Activity, ArrowUpRight, ArrowDownRight,
-  Archive, Loader2, Shield, RefreshCw,
+  Activity, Archive, Loader2, Shield, RefreshCw, Radio,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
@@ -40,6 +39,18 @@ type AnalyticsData = {
   apps: Array<{ id: string; name: string; slug: string; iconUrl: string | null; status: string; launchUrl: string | null }>;
   byApp: Record<string, Array<{ date: string; views: number }>>;
   totals: Record<string, number>;
+};
+
+type LiveEvent = {
+  id: string;
+  createdAt: string;
+  userAgent: string | null;
+  app: { name: string; iconUrl: string | null; slug: string };
+};
+
+type LiveData = {
+  activeCount: number;
+  recentEvents: LiveEvent[];
 };
 
 // ── Root ────────────────────────────────────────────────────────────────────
@@ -110,6 +121,14 @@ function CreatorDashboard({ user }: { user: { displayName?: string | null; email
     queryKey: ["mine-analytics"],
     queryFn: () => apiFetch<AnalyticsData>("/api/v1/apps/mine/analytics"),
     enabled: mode === "analytics",
+    refetchInterval: mode === "analytics" ? 30_000 : false,
+  });
+
+  const { data: liveData } = useQuery({
+    queryKey: ["mine-live"],
+    queryFn: () => apiFetch<LiveData>("/api/v1/apps/mine/live"),
+    enabled: mode === "analytics",
+    refetchInterval: mode === "analytics" ? 15_000 : false,
   });
 
   const deleteMutation = useMutation({
@@ -188,7 +207,7 @@ function CreatorDashboard({ user }: { user: { displayName?: string | null; email
           </div>
         </>
       ) : (
-        <AnalyticsView analytics={analytics} loading={analyticsLoading} />
+        <AnalyticsView analytics={analytics} loading={analyticsLoading} live={liveData} />
       )}
     </div>
   );
@@ -266,7 +285,7 @@ function StatusBadge({ status }: { status: string }) {
 
 // ── Analytics View ───────────────────────────────────────────────────────────
 
-function AnalyticsView({ analytics, loading }: { analytics: AnalyticsData | undefined; loading: boolean }) {
+function AnalyticsView({ analytics, loading, live }: { analytics: AnalyticsData | undefined; loading: boolean; live?: LiveData }) {
   const totalViews = useMemo(() =>
     analytics ? Object.values(analytics.totals).reduce((a, b) => a + b, 0) : 0,
     [analytics]
@@ -375,8 +394,54 @@ function AnalyticsView({ analytics, loading }: { analytics: AnalyticsData | unde
           </table>
         </div>
       )}
+
+      {/* Live feed */}
+      <div className="mt-3 rounded-2xl bg-background/5 border border-background/10 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <span className="relative flex size-2.5">
+              <span className="absolute inset-0 rounded-full bg-mint animate-ping opacity-60" />
+              <span className="relative rounded-full bg-mint size-2.5" />
+            </span>
+            <h3 className="font-display text-xl text-background">Live now</h3>
+            <span className="text-background/50 text-sm">· {live?.activeCount ?? 0} visits in last 5 min</span>
+          </div>
+          <div className="flex items-center gap-1 text-xs text-background/40">
+            <Radio className="size-3" /> auto-refresh 15s
+          </div>
+        </div>
+        {!live || live.recentEvents.length === 0 ? (
+          <p className="text-background/40 text-sm py-4 text-center">No visits yet in the last 5 minutes.</p>
+        ) : (
+          <div className="space-y-2">
+            {live.recentEvents.map(ev => (
+              <div key={ev.id} className="flex items-center gap-3 py-2 border-b border-background/5 last:border-0">
+                <div className="size-7 rounded-lg bg-background/10 grid place-items-center shrink-0 overflow-hidden">
+                  {ev.app.iconUrl
+                    ? <img src={ev.app.iconUrl} className="size-5 rounded" alt="" />
+                    : <Rocket className="size-3.5 text-background/40" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-background/60 text-sm">visited </span>
+                  <span className="text-background text-sm font-semibold">{ev.app.name}</span>
+                </div>
+                <span className="text-xs text-background/30 tabular-nums shrink-0">
+                  {timeAgo(ev.createdAt)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
+}
+
+function timeAgo(iso: string): string {
+  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  return `${Math.floor(s / 3600)}h ago`;
 }
 
 // ── Admin Dashboard ──────────────────────────────────────────────────────────

@@ -1,58 +1,55 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Compass, TrendingUp, Plus, BarChart3, User as UserIcon } from "lucide-react";
-import { useStore } from "@/lib/store";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function MobileNav() {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
-  const { users, currentUserId, mode } = useStore();
-  const me = users.find((u) => u.id === currentUserId)!;
-  const isFounder = mode === "founder";
+  const { user, isAuthenticated } = useAuth();
   const is = (p: string) => pathname === p;
+
+  const avatarEl = isAuthenticated && user ? (
+    user.avatarUrl
+      ? <img src={user.avatarUrl} alt="" className="size-6 rounded-full object-cover sticker" />
+      : (() => {
+          const name = user.displayName ?? user.email;
+          const hue = name.split("").reduce((n, c) => n + c.charCodeAt(0), 0) % 360;
+          return (
+            <span
+              className="grid place-items-center size-6 rounded-full text-[10px] font-bold text-white sticker"
+              style={{ background: `oklch(0.65 0.18 ${hue})` }}
+            >
+              {name.slice(0, 2).toUpperCase()}
+            </span>
+          );
+        })()
+  ) : <UserIcon className="size-5" />;
 
   return (
     <nav
-      className={`md:hidden fixed bottom-0 inset-x-0 z-40 pb-[env(safe-area-inset-bottom)] ${
-        isFounder ? "bg-foreground/95 text-background border-t border-background/10" : "bg-background/90 border-t border-border"
-      } backdrop-blur-xl`}
+      className="md:hidden fixed bottom-0 inset-x-0 z-40 pb-[env(safe-area-inset-bottom)] bg-background/90 border-t border-border backdrop-blur-xl"
       aria-label="Primary"
     >
       <div className="relative mx-auto max-w-md grid grid-cols-5 items-end px-2 pt-1">
-        <Item to="/" active={is("/")} icon={<Compass className="size-5" />} label="Discover" founder={isFounder} />
-        <Item to="/trending" active={is("/trending")} icon={<TrendingUp className="size-5" />} label="Trending" founder={isFounder} />
+        <Item to="/" active={is("/")} icon={<Compass className="size-5" />} label="Discover" />
+        <Item to="/trending" active={is("/trending")} icon={<TrendingUp className="size-5" />} label="Trending" />
 
-        {/* center submit — raised */}
         <div className="flex justify-center -mt-7">
           <Link
             to="/submit"
             aria-label="Submit a tool"
-            className={`grid place-items-center size-14 rounded-full sticker active:scale-95 transition ${
-              isFounder ? "bg-mint text-mint-foreground" : "bg-primary text-foreground"
-            }`}
-            style={{
-              boxShadow:
-                "0 12px 28px oklch(0.22 0.03 60 / 0.25), 0 1px 0 oklch(1 1 1 / 0.25) inset",
-            }}
+            className="grid place-items-center size-14 rounded-full bg-primary text-foreground sticker active:scale-95 transition"
+            style={{ boxShadow: "0 12px 28px oklch(0.22 0.03 60 / 0.25), 0 1px 0 oklch(1 1 1 / 0.25) inset" }}
           >
             <Plus className="size-6" strokeWidth={2.75} />
           </Link>
         </div>
 
-        <Item to="/dashboard" active={is("/dashboard")} icon={<BarChart3 className="size-5" />} label={isFounder ? "Stats" : "Yours"} founder={isFounder} />
+        <Item to="/dashboard" active={is("/dashboard")} icon={<BarChart3 className="size-5" />} label="Dashboard" />
         <Item
-          to="/u/$username"
-          params={{ username: me.username }}
+          to="/dashboard"
           active={pathname.startsWith("/u/")}
-          icon={
-            <span
-              className="grid place-items-center size-6 rounded-full text-[12px] sticker"
-              style={{ backgroundColor: me.avatarColor }}
-              aria-hidden
-            >
-              {me.emoji ?? <UserIcon className="size-3.5 text-white" />}
-            </span>
-          }
+          icon={avatarEl}
           label="You"
-          founder={isFounder}
         />
       </div>
     </nav>

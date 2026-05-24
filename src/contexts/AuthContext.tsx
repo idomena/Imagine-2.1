@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { onAuthChange, tokenStorage, type ApiUser } from "@/lib/api";
+import { apiFetch, onAuthChange, tokenStorage, type ApiUser } from "@/lib/api";
 import * as authApi from "@/lib/auth";
 
 type AuthContextValue = {
@@ -18,15 +18,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Hydrate from localStorage on the client.
-    setUser(tokenStorage.getUser());
-    setLoading(false);
+    // Hydrate from localStorage immediately so auth state is available fast.
+    const stored = tokenStorage.getUser();
+    setUser(stored);
+
+    // If a token exists, fetch fresh user data (includes displayName, role, avatarUrl)
+    // and update localStorage so stale data is replaced silently.
+    if (stored && tokenStorage.getAccess()) {
+      apiFetch<ApiUser>("/api/v1/auth/me")
+        .then((fresh) => {
+          tokenStorage.set({
+            accessToken:  tokenStorage.getAccess()!,
+            refreshToken: tokenStorage.getRefresh()!,
+            user: fresh,
+          });
+          setUser(fresh);
+        })
+        .catch(() => {
+          // Token expired or invalid — leave user as-is; refresh will handle it
+        })
+        .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
+    }
+
     const unsub = onAuthChange(() => {
       setUser(tokenStorage.getUser());
     });
-    return () => {
-      unsub();
-    };
+    return () => { unsub(); };
   }, []);
 
   const value: AuthContextValue = {

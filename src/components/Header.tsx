@@ -1,15 +1,11 @@
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
-import { Plus, Compass, BarChart3, LogOut, LogIn } from "lucide-react";
-import { useStore, actions } from "@/lib/store";
+import { Plus, LogOut, LogIn } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import logo from "@/assets/logo.png";
 
 export function Header() {
-  const { users, currentUserId, mode } = useStore();
-  const me = users.find((u) => u.id === currentUserId)!;
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const isActive = (p: string) => pathname === p;
-  const isFounder = mode === "founder";
   const { user, isAuthenticated, logout } = useAuth();
   const router = useRouter();
 
@@ -19,56 +15,35 @@ export function Header() {
   };
 
   return (
-    <header
-      className={`sticky top-0 z-40 backdrop-blur-xl border-b transition-colors ${
-        isFounder ? "bg-foreground/95 border-foreground/20 text-background" : "bg-background/80 border-border/70"
-      }`}
-    >
+    <header className="sticky top-0 z-40 backdrop-blur-xl border-b bg-background/80 border-border/70 transition-colors">
       <div className="mx-auto max-w-6xl px-3 sm:px-4 h-14 sm:h-20 flex items-center gap-2 sm:gap-5">
         <Link to="/" className="flex items-center group -my-2">
-          <img
-            src={logo}
-            alt="Imagine"
-            className={`h-10 sm:h-16 w-auto group-hover:-rotate-2 transition ${isFounder ? "invert brightness-0" : ""}`}
-          />
+          <img src={logo} alt="Imagine" className="h-10 sm:h-16 w-auto group-hover:-rotate-2 transition" />
         </Link>
 
         <div className="hidden md:flex items-center gap-1 flex-1 ml-2">
-          <NavLink to="/" active={isActive("/")} founder={isFounder}>Discover</NavLink>
-          <NavLink to="/trending" active={isActive("/trending")} founder={isFounder}>Trending</NavLink>
-          <NavLink to="/dashboard" active={isActive("/dashboard")} founder={isFounder}>
-            {isFounder ? "Analytics" : "Dashboard"}
-          </NavLink>
+          <NavLink to="/" active={isActive("/")}>Discover</NavLink>
+          <NavLink to="/trending" active={isActive("/trending")}>Trending</NavLink>
+          <NavLink to="/dashboard" active={isActive("/dashboard")}>Dashboard</NavLink>
         </div>
-
-        {/* Mode toggle */}
-        <ModeToggle mode={mode} />
 
         <Link
           to="/submit"
-          className={`hidden sm:inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold sticker hover:-translate-y-0.5 transition-transform ${
-            isFounder ? "bg-mint text-mint-foreground" : "bg-primary text-primary-foreground"
-          }`}
+          className="hidden sm:inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold bg-primary text-primary-foreground sticker hover:-translate-y-0.5 transition-transform"
         >
           <Plus className="size-4" strokeWidth={2.75} />
           Submit
         </Link>
 
-        {isAuthenticated ? (
+        {isAuthenticated && user ? (
           <div className="ml-1 flex items-center gap-2">
-            <Link
-              to="/u/$username"
-              params={{ username: me.username }}
-              title={user?.displayName || user?.email}
-            >
-              <Avatar user={me} />
+            <Link to="/dashboard" title={user.displayName ?? user.email}>
+              <UserAvatar user={user} />
             </Link>
             <button
               onClick={handleLogout}
               title="Log out"
-              className={`hidden sm:inline-flex items-center justify-center size-9 rounded-full sticker transition hover:-translate-y-0.5 ${
-                isFounder ? "bg-background/10 text-background" : "bg-card text-foreground"
-              }`}
+              className="hidden sm:inline-flex items-center justify-center size-9 rounded-full bg-card text-foreground sticker transition hover:-translate-y-0.5"
             >
               <LogOut className="size-4" />
             </button>
@@ -76,9 +51,7 @@ export function Header() {
         ) : (
           <Link
             to="/login"
-            className={`ml-1 inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold sticker hover:-translate-y-0.5 transition ${
-              isFounder ? "bg-background/10 text-background" : "bg-card text-foreground"
-            }`}
+            className="ml-1 inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold bg-card text-foreground sticker hover:-translate-y-0.5 transition"
           >
             <LogIn className="size-4" />
             Log in
@@ -89,46 +62,29 @@ export function Header() {
   );
 }
 
-function ModeToggle({ mode }: { mode: "user" | "founder" }) {
-  return (
-    <div className="flex items-center rounded-full bg-card/20 backdrop-blur p-1 border border-current/20 text-xs font-semibold">
-      <button
-        onClick={() => actions.setMode("user")}
-        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 transition ${
-          mode === "user" ? "bg-primary text-foreground sticker" : "opacity-70 hover:opacity-100"
-        }`}
-        title="Browse like a user"
-      >
-        <Compass className="size-3.5" />
-        <span className="hidden sm:inline">User</span>
-      </button>
-      <button
-        onClick={() => actions.setMode("founder")}
-        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 transition ${
-          mode === "founder" ? "bg-mint text-mint-foreground sticker" : "opacity-70 hover:opacity-100"
-        }`}
-        title="Switch to founder analytics"
-      >
-        <BarChart3 className="size-3.5" />
-        <span className="hidden sm:inline">Founder</span>
-      </button>
-    </div>
-  );
-}
+function UserAvatar({ user }: { user: { displayName?: string | null; email: string; avatarUrl?: string | null } }) {
+  const name = user.displayName ?? user.email;
+  const initials = name.slice(0, 2).toUpperCase();
 
+  if (user.avatarUrl) {
+    return (
+      <img
+        src={user.avatarUrl}
+        alt={name}
+        className="size-9 rounded-full object-cover sticker hover:-rotate-6 transition-transform border-2 border-border"
+      />
+    );
+  }
 
-function Avatar({ user }: { user: { name: string; emoji?: string; avatarColor: string } }) {
+  // Deterministic color from name
+  const hue = name.split("").reduce((n, c) => n + c.charCodeAt(0), 0) % 360;
   return (
     <div
-      className="size-10 rounded-full grid place-items-center font-semibold sticker hover:-rotate-6 transition-transform"
-      style={{ backgroundColor: user.avatarColor }}
-      title={user.name}
+      className="size-9 rounded-full grid place-items-center text-white text-xs font-bold sticker hover:-rotate-6 transition-transform"
+      style={{ background: `oklch(0.65 0.18 ${hue})` }}
+      title={name}
     >
-      {user.emoji ? (
-        <span className="text-lg leading-none">{user.emoji}</span>
-      ) : (
-        <span className="text-white text-sm">{user.name[0]}</span>
-      )}
+      {initials}
     </div>
   );
 }
