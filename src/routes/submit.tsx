@@ -1,8 +1,11 @@
-import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useSearch, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { Link2, Sparkles, Loader2, Pencil, Wand2 } from "lucide-react";
+import { Link2, Sparkles, Loader2, Pencil, Wand2, LogIn } from "lucide-react";
 import { toast } from "sonner";
-import { actions, CATEGORIES } from "@/lib/store";
+import { useQuery } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
+import { useCategories, type ApiCategory } from "@/hooks/use-apps";
 
 export const Route = createFileRoute("/submit")({
   component: SubmitPage,
@@ -10,18 +13,38 @@ export const Route = createFileRoute("/submit")({
 
 type Mode = "auto" | "manual";
 
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 60);
+}
+
 function SubmitPage() {
   const navigate = useNavigate();
   const search = useSearch({ from: "/submit" });
+  const { isAuthenticated, loading: authLoading } = useAuth();
+  const { data: categories } = useCategories();
+
   const [mode, setMode] = useState<Mode>("auto");
   const [url, setUrl] = useState((search as Record<string, unknown>).url as string || "");
   const [name, setName] = useState("");
   const [tagline, setTagline] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("Productivity");
-  const [tags, setTags] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const [fetching, setFetching] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
+
+  // Set default category when categories load
+  useEffect(() => {
+    if (categories && categories.length > 0 && !categoryId) {
+      setCategoryId(categories[0].id);
+    }
+  }, [categories, categoryId]);
 
   useEffect(() => {
     const incomingUrl = (search as Record<string, unknown>).url as string;
@@ -33,15 +56,16 @@ function SubmitPage() {
     setFetching(true);
     await new Promise((r) => setTimeout(r, 600));
     try {
-      const host = new URL(incomingUrl.startsWith("http") ? incomingUrl : `https://${incomingUrl}`).hostname.replace(/^www\./, "");
+      const normalized = incomingUrl.startsWith("http") ? incomingUrl : `https://${incomingUrl}`;
+      const host = new URL(normalized).hostname.replace(/^www\./, "");
       const auto = host.split(".")[0];
-      setUrl(incomingUrl.startsWith("http") ? incomingUrl : `https://${incomingUrl}`);
+      setUrl(normalized);
       setName(auto.charAt(0).toUpperCase() + auto.slice(1));
       setTagline("A delightful new tool");
       setDescription(`${auto} helps you do more with less. Built by an indie maker.`);
       setStep(2);
     } catch {
-      // invalid URL, stay on step 1
+      // invalid URL
     } finally {
       setFetching(false);
     }
@@ -49,37 +73,84 @@ function SubmitPage() {
 
   const handleFetch = async () => {
     if (!url) return toast.error("Paste your tool URL first");
-    try {
-      new URL(url.startsWith("http") ? url : `https://${url}`);
-    } catch {
-      return toast.error("That doesn't look like a valid URL");
-    }
+    try { new URL(url.startsWith("http") ? url : `https://${url}`); }
+    catch { return toast.error("That doesn't look like a valid URL"); }
     await handleAutoFetch(url);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !tagline.trim()) return toast.error("Name and tagline are required");
-    if (mode === "manual" && !url.trim()) return toast.error("A URL is required");
+    if (!url.trim()) return toast.error("A URL is required");
+
     let finalUrl = url.trim();
-    if (finalUrl && !finalUrl.startsWith("http")) finalUrl = `https://${finalUrl}`;
-    try { if (finalUrl) new URL(finalUrl); } catch { return toast.error("Invalid URL"); }
-    const tool = actions.addTool({
-      name: name.trim(),
-      tagline: tagline.trim(),
-      description: description.trim(),
-      url: finalUrl,
-      category,
-      tags: tags.split(",").map((t) => t.trim()).filter(Boolean).slice(0, 4),
-    });
-    toast.success("Your tool is live!");
-    navigate({ to: "/tool/$toolId", params: { toolId: tool.id } });
+    if (!finalUrl.startsWith("http")) finalUrl = `https://${finalUrl}`;
+    try { new URL(finalUrl); } catch { return toast.error("Invalid URL"); }
+
+    if (finalUrl.startsWith("http://")) {
+      return toast.error("URL must use HTTPS");
+    }
+
+    const slug = slugify(name.trim());
+    if (!slug) return toast.error("Could not generate a slug from that name");
+
+    setSubmitting(true);
+    try {
+      // Step 1: create draft
+      const created = await apiFetch<{ id: string; slug: string }>("/api/v1/apps", {
+        method: "POST",
+        body: {
+          slug,
+          name: name.trim(),
+          tagline: tagline.trim(),
+          description: description.trim() || undefined,
+          launchUrl: finalUrl,
+          categoryId: categoryId || undefined,
+        },
+      });
+
+      // Step 2: submit for review/auto-publish
+      await apiFetch(`/api/v1/apps/${created.id}/submit`, { method: "POST" });
+
+      toast.success("Your tool is live! 🚀");
+      navigate({ to: "/dashboard" });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Something went wrong";
+      // Slug conflict → try with a timestamp suffix
+      if (msg.includes("already taken")) {
+        toast.error("That name is already taken — try adding a word or number to make it unique.");
+      } else {
+        toast.error(msg);
+      }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const startManual = () => {
-    setMode("manual");
-    setStep(2);
-  };
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-24 text-center">
+        <h1 className="font-display text-4xl">Sign in first</h1>
+        <p className="mt-3 text-muted-foreground">You need an account to submit a tool.</p>
+        <Link
+          to="/login"
+          className="mt-6 inline-flex items-center gap-2 rounded-full bg-primary text-foreground px-6 py-3 font-semibold sticker hover:-translate-y-0.5 transition"
+        >
+          <LogIn className="size-4" /> Log in / Register
+        </Link>
+      </div>
+    );
+  }
+
+  const startManual = () => { setMode("manual"); setStep(2); };
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
@@ -153,7 +224,7 @@ function SubmitPage() {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Field label="Tool URL" hint="Required">
+            <Field label="Tool URL" hint="Required — must be HTTPS">
               <div className="flex items-center gap-2 rounded-2xl border border-border focus-within:border-mint focus-within:ring-2 focus-within:ring-mint/20 bg-background px-3">
                 <Link2 className="size-4 text-muted-foreground" />
                 <input
@@ -179,16 +250,16 @@ function SubmitPage() {
                 className={inputCls}
               />
             </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Category">
-                <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
-                  {CATEGORIES.filter((c) => c !== "All").map((c) => <option key={c}>{c}</option>)}
-                </select>
-              </Field>
-              <Field label="Tags" hint="Comma-separated">
-                <input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="AI, Notes" className={inputCls} />
-              </Field>
-            </div>
+            <Field label="Category">
+              <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={inputCls}>
+                {(categories ?? []).map((c: ApiCategory) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+                {(!categories || categories.length === 0) && (
+                  <option value="">Loading categories…</option>
+                )}
+              </select>
+            </Field>
             <div className="flex gap-2 pt-2">
               {mode === "auto" && (
                 <button
@@ -201,9 +272,10 @@ function SubmitPage() {
               )}
               <button
                 type="submit"
-                className="flex-1 rounded-full bg-primary text-foreground py-3 font-semibold sticker hover:-translate-y-0.5 transition"
+                disabled={submitting}
+                className="flex-1 rounded-full bg-primary text-foreground py-3 font-semibold sticker hover:-translate-y-0.5 transition disabled:opacity-60 disabled:translate-y-0 inline-flex items-center justify-center gap-2"
               >
-                Launch into the yard 🚀
+                {submitting ? <><Loader2 className="size-4 animate-spin" /> Launching…</> : "Launch into the yard 🚀"}
               </button>
             </div>
           </form>
