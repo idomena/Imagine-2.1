@@ -43,7 +43,7 @@ export function Header() {
             <button
               onClick={handleLogout}
               title="Log out"
-              className="hidden sm:inline-flex items-center justify-center size-9 rounded-full bg-card text-foreground sticker transition hover:-translate-y-0.5"
+              className="inline-flex items-center justify-center size-9 rounded-full bg-card text-foreground sticker transition hover:-translate-y-0.5"
             >
               <LogOut className="size-4" />
             </button>

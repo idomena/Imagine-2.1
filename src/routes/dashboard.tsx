@@ -154,20 +154,20 @@ function CreatorDashboard({ user }: { user: { displayName?: string | null; email
   const name = user.displayName?.split(" ")[0] ?? user.email.split("@")[0];
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10">
-      <div className="flex items-start justify-between flex-wrap gap-4">
+    <div className="mx-auto max-w-5xl px-4 py-6 sm:py-10">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
-          <h1 className="font-display text-4xl">Welcome back, {name}</h1>
-          <p className="text-muted-foreground mt-1">Manage your apps and track performance.</p>
+          <h1 className="font-display text-3xl sm:text-4xl">Welcome back, {name}</h1>
+          <p className="text-muted-foreground mt-1 text-sm sm:text-base">Manage your apps and track performance.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => setMode(mode === "apps" ? "analytics" : "apps")}
-            className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold hover:bg-muted/40 transition"
+            className="inline-flex items-center gap-2 rounded-full border border-border px-3 sm:px-4 py-2 text-sm font-semibold hover:bg-muted/40 transition"
           >
             {mode === "apps" ? <><TrendingUp className="size-4" /> Analytics</> : <><Rocket className="size-4" /> Apps</>}
           </button>
-          <Link to="/submit" className="inline-flex items-center gap-2 rounded-full bg-primary text-foreground px-5 py-2.5 font-semibold hover:-translate-y-0.5 transition">
+          <Link to="/submit" className="inline-flex items-center gap-2 rounded-full bg-primary text-foreground px-4 sm:px-5 py-2 sm:py-2.5 text-sm font-semibold hover:-translate-y-0.5 transition">
             <Plus className="size-4" /> New app
           </Link>
         </div>
@@ -175,7 +175,7 @@ function CreatorDashboard({ user }: { user: { displayName?: string | null; email
 
       {mode === "apps" ? (
         <>
-          <div className="mt-6 grid sm:grid-cols-3 gap-3">
+          <div className="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
             <StatCard icon={<Rocket className="size-5" />} label="Apps" value={apps.length} tone="primary" />
             <StatCard icon={<Eye className="size-5" />} label="Published" value={apps.filter(a => a.status === "PUBLISHED").length} tone="mint" />
             <StatCard icon={<Activity className="size-5" />} label="In review" value={apps.filter(a => ["SUBMITTED", "IN_REVIEW", "APPROVED"].includes(a.status)).length} tone="default" />
