@@ -443,21 +443,6 @@ function KPI({ icon, label, value }: { icon: React.ReactNode; label: string; val
   );
 }
 
-function KPI({ icon, label, value, delta, positive }: { icon: React.ReactNode; label: string; value: string; delta: string; positive: boolean }) {
-  return (
-    <div className="rounded-3xl bg-background/5 border border-background/10 p-5">
-      <div className="flex items-center gap-2 text-xs text-background/60 font-semibold uppercase tracking-wider">
-        <span className="text-mint">{icon}</span>
-        {label}
-      </div>
-      <div className="mt-2 font-display text-4xl text-background">{value}</div>
-      <div className={`mt-1 text-xs font-semibold inline-flex items-center gap-1 ${positive ? "text-mint" : "text-destructive"}`}>
-        {positive ? <ArrowUpRight className="size-3" /> : <ArrowDownRight className="size-3" />}
-        {delta} <span className="text-background/40 font-medium ml-1">vs prev 30d</span>
-      </div>
-    </div>
-  );
-}
 
 function BigChart({ series }: { series: number[] }) {
   const w = 720;
