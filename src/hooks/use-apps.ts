@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
-import type { Tool } from "@/lib/store";
+import { useStore, type Tool } from "@/lib/store";
 
 export type ApiApp = {
   id: string;
