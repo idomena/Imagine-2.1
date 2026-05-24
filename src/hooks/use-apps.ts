@@ -57,21 +57,36 @@ export function useCategories() {
 
 export function useApps() {
   const { data: categories } = useCategories();
+  const localState = useStore();
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ["apps"],
     queryFn: () =>
       apiFetch<{ items: ApiApp[]; total: number }>("/api/v1/apps?limit=50", {
         skipAuth: true,
       }),
     staleTime: 2 * 60 * 1000,
+    retry: 0,
   });
 
   const categoryMap = new Map(
     (categories ?? []).map((c: ApiCategory) => [c.id, c.name]),
   );
 
-  const tools: Tool[] = (data?.items ?? []).map((app) => toTool(app, categoryMap));
+  // Backend unreachable / errored → fall back to local demo tools so the app
+  // remains usable while the backend is being fixed.
+  const usingFallback = isError;
+  const tools: Tool[] = usingFallback
+    ? localState.tools
+    : (data?.items ?? []).map((app) => toTool(app, categoryMap));
 
-  return { tools, isLoading, isError, total: data?.total ?? 0 };
+  return {
+    tools,
+    isLoading: isLoading && !usingFallback,
+    isError: false,
+    usingFallback,
+    backendError: error instanceof Error ? error.message : null,
+    total: usingFallback ? localState.tools.length : (data?.total ?? 0),
+  };
 }
+
