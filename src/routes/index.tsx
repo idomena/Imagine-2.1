@@ -102,7 +102,7 @@ function Home() {
           </div>
           <Link to="/trending" className="text-sm font-medium text-mint hover:underline shrink-0">View all →</Link>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
           {topThree.map((t, i) => (
             <ToolCard key={t.id} tool={t} rank={i + 1} />
           ))}
@@ -148,7 +148,7 @@ function Home() {
           </div>
         ) : (
           <>
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               {filtered.map((t) => (
                 <ToolCard key={t.id} tool={t} />
               ))}
