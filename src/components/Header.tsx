@@ -24,12 +24,12 @@ export function Header() {
         isFounder ? "bg-foreground/95 border-foreground/20 text-background" : "bg-background/80 border-border/70"
       }`}
     >
-      <div className="mx-auto max-w-6xl px-4 h-20 sm:h-24 flex items-center gap-5">
+      <div className="mx-auto max-w-6xl px-3 sm:px-4 h-14 sm:h-20 flex items-center gap-2 sm:gap-5">
         <Link to="/" className="flex items-center group -my-2">
           <img
             src={logo}
             alt="Imagine"
-            className={`h-16 sm:h-20 w-auto group-hover:-rotate-2 transition ${isFounder ? "invert brightness-0" : ""}`}
+            className={`h-10 sm:h-16 w-auto group-hover:-rotate-2 transition ${isFounder ? "invert brightness-0" : ""}`}
           />
         </Link>
 

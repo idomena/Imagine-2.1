@@ -48,62 +48,61 @@ function Home() {
         <div className="absolute top-20 -right-10 size-72 rounded-full bg-mint/25 blur-3xl" />
 
 
-        <div className="relative mx-auto max-w-5xl px-4 pt-14 sm:pt-20 pb-12 sm:pb-14 text-center">
+        <div className="relative mx-auto max-w-5xl px-4 pt-8 sm:pt-20 pb-8 sm:pb-14 text-center">
           <div className="inline-flex items-center gap-2 rounded-full bg-card border border-border px-3 py-1 text-[11px] sm:text-xs font-medium text-foreground/70 sticker">
             <Sparkles className="size-3.5 text-mint" />
             <span className="hidden sm:inline">New: paste any URL — your tool goes live in 10 seconds</span>
             <span className="sm:hidden">Paste a URL → live in 10s</span>
           </div>
 
-          <h1 className="mt-6 sm:mt-7 font-display font-normal text-[3rem] leading-[0.95] sm:text-7xl sm:leading-[0.92] lg:text-[6rem] tracking-[-0.02em]">
+          <h1 className="mt-4 sm:mt-7 font-display font-normal text-[2.4rem] leading-[0.95] sm:text-7xl sm:leading-[0.92] lg:text-[6rem] tracking-[-0.02em]">
             Discover & launch
             <br />
             <span className="italic text-mint">powerful apps</span>
           </h1>
 
-          <p className="mt-6 sm:mt-8 text-base sm:text-xl text-foreground/70 max-w-xl mx-auto leading-relaxed px-2">
+          <p className="mt-4 sm:mt-8 text-sm sm:text-xl text-foreground/70 max-w-xl mx-auto leading-relaxed px-2">
             The fastest way to ship your product and get discovered by thousands of makers & users.
           </p>
 
-
           <UrlPasteBar />
 
-          <div className="mt-6 flex items-center justify-center gap-3 flex-wrap">
+          <div className="mt-5 flex items-center justify-center gap-2 sm:gap-3 flex-wrap">
             <Link
               to="/trending"
-              className="inline-flex items-center gap-2 rounded-full bg-card border border-border px-5 py-2.5 font-semibold hover:-translate-y-0.5 transition sticker"
+              className="inline-flex items-center gap-2 rounded-full bg-card border border-border px-4 sm:px-5 py-2 sm:py-2.5 text-sm font-semibold hover:-translate-y-0.5 transition sticker"
             >
               <TrendingUp className="size-4" />
               See what's trending
             </Link>
             <Link
               to="/dashboard"
-              className="inline-flex items-center gap-2 rounded-full text-foreground/70 hover:text-foreground px-3 py-2.5 font-medium transition"
+              className="inline-flex items-center gap-2 rounded-full text-foreground/70 hover:text-foreground px-3 py-2 text-sm font-medium transition"
             >
               Or open your dashboard →
             </Link>
           </div>
 
-          <div className="mt-10 flex items-center justify-center gap-7 text-sm text-foreground/60 flex-wrap">
-            <Stat icon={<Rocket className="size-4" />} label={`${tools.length} apps live`} />
-            <Stat icon={<Users className="size-4" />} label="indie makers" />
-            <Stat icon={<Heart className="size-4" />} label={`${upvoted.size} upvotes given`} />
+          <div className="mt-6 flex items-center justify-center gap-4 sm:gap-7 text-xs sm:text-sm text-foreground/60 flex-wrap">
+            <Stat icon={<Rocket className="size-3.5 sm:size-4" />} label={`${tools.length} apps live`} />
+            <Stat icon={<Users className="size-3.5 sm:size-4" />} label="indie makers" />
+            <Stat icon={<Heart className="size-3.5 sm:size-4" />} label={`${upvoted.size} upvotes given`} />
           </div>
         </div>
       </section>
 
       {/* TOP 3 PODIUM */}
       <section className="mx-auto max-w-6xl px-4 mt-4">
-        <div className="flex items-end justify-between mb-5">
+        <div className="flex items-end justify-between mb-4">
           <div>
-            <h2 className="font-display text-3xl flex items-center gap-2">
-              <span className="text-2xl">🏆</span> Top of the yard
+            <h2 className="font-display text-2xl sm:text-3xl flex items-center gap-2">
+              <span className="text-xl sm:text-2xl">🏆</span> Top of the yard
             </h2>
-            <p className="text-sm text-muted-foreground mt-1">The most-loved tools this week.</p>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1">The most-loved tools this week.</p>
           </div>
-          <Link to="/trending" className="text-sm font-medium text-mint hover:underline">View all →</Link>
+          <Link to="/trending" className="text-sm font-medium text-mint hover:underline shrink-0">View all →</Link>
         </div>
-        <div className="grid sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
           {topThree.map((t, i) => (
             <ToolCard key={t.id} tool={t} rank={i + 1} />
           ))}
@@ -111,17 +110,19 @@ function Home() {
       </section>
 
       {/* FEED */}
-      <section className="mx-auto max-w-6xl px-4 mt-16">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
-          <div>
-            <h2 className="font-display text-3xl">Fresh from the yard</h2>
-            <p className="text-sm text-muted-foreground mt-1">Brand-new tools, picked daily by the community.</p>
+      <section className="mx-auto max-w-6xl px-4 mt-10 sm:mt-16">
+        <div className="flex flex-col gap-3 mb-4 sm:mb-5">
+          <div className="flex items-end justify-between">
+            <div>
+              <h2 className="font-display text-2xl sm:text-3xl">Fresh from the yard</h2>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1">Brand-new tools, picked daily by the community.</p>
+            </div>
           </div>
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search tools, tags, makers…"
-            className="px-4 py-2.5 rounded-full bg-card border border-border focus:border-mint focus:ring-2 focus:ring-mint/20 outline-none text-sm w-full sm:w-72"
+            className="px-4 py-2.5 rounded-full bg-card border border-border focus:border-mint focus:ring-2 focus:ring-mint/20 outline-none text-sm w-full"
           />
         </div>
 
@@ -287,9 +288,9 @@ function UrlPasteBar() {
   }
 
   return (
-    <div className="relative mx-auto max-w-xl w-full mt-24">
+    <div className="relative mx-auto max-w-xl w-full mt-10 sm:mt-20">
       {/* Cozy hand-drawn pointer above-left of the URL bar */}
-      <div className="pointer-events-none absolute -top-16 left-2 sm:-left-6 flex flex-col items-start animate-wiggle-point text-foreground">
+      <div className="pointer-events-none absolute -top-14 left-2 sm:-left-6 flex flex-col items-start animate-wiggle-point text-foreground">
         <span className="font-serif-italic italic text-sm sm:text-base leading-none whitespace-nowrap">
           psst… drop your link here
         </span>
