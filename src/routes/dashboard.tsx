@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useState } from "react";
 import {
   Rocket,
   ArrowUp,
@@ -15,9 +15,13 @@ import {
   Activity,
   ArrowUpRight,
   ArrowDownRight,
+  Loader2,
+  AlertTriangle,
 } from "lucide-react";
-import { actions, useStore, timeAgo, Tool } from "@/lib/store";
+import { actions, useStore, timeAgo } from "@/lib/store";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { useAnalyticsOverview, type AnalyticsRange } from "@/hooks/use-analytics";
 
 export const Route = createFileRoute("/dashboard")({
   component: Dashboard,
