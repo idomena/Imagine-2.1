@@ -12,6 +12,7 @@ import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiFetch, API_BASE_URL } from "@/lib/api";
+import { useStore, type Tool } from "@/lib/store";
 
 export const Route = createFileRoute("/tool/$toolId")({
   component: ToolDetail,
@@ -46,6 +47,26 @@ type ApiApp = {
   }>;
 };
 
+function localToolToApp(tool: Tool): ApiApp {
+  return {
+    id: tool.id,
+    slug: tool.id,
+    name: tool.name,
+    tagline: tool.tagline,
+    description: tool.description,
+    launchUrl: tool.url,
+    iconUrl: tool.faviconUrl,
+    primaryColor: tool.coverColor,
+    categoryId: tool.category,
+    createdAt: new Date(tool.createdAt).toISOString(),
+    publishedAt: new Date(tool.createdAt).toISOString(),
+    creator: { id: tool.makerId, displayName: "Imagine maker", avatarUrl: null },
+    category: { id: tool.category, name: tool.category, slug: tool.category.toLowerCase() },
+    tags: tool.tags.map((name) => ({ id: name, name, slug: name.toLowerCase() })),
+    appReviews: [],
+  };
+}
+
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const s = Math.floor(diff / 1000);
@@ -63,11 +84,15 @@ function timeAgo(iso: string): string {
 
 function ToolDetail() {
   const { toolId } = Route.useParams();
+  const { tools } = useStore();
+  const localTool = tools.find((tool) => tool.id === toolId);
 
   const { data: app, isLoading, error } = useQuery<ApiApp>({
     queryKey: ["app", toolId],
     queryFn: () => apiFetch<ApiApp>(`/api/v1/apps/${toolId}`),
     staleTime: 60_000,
+    retry: 0,
+    enabled: !localTool,
   });
 
   // Track page view for analytics — fire-and-forget
@@ -76,7 +101,9 @@ function ToolDetail() {
     fetch(`${API_BASE_URL}/api/v1/apps/${toolId}/view`, { method: "POST" }).catch(() => {});
   }, [toolId]);
 
-  if (isLoading) {
+  const shownApp = localTool ? localToolToApp(localTool) : app;
+
+  if (isLoading && !shownApp) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-24 flex justify-center">
         <Loader2 className="size-8 animate-spin text-muted-foreground" />
@@ -84,7 +111,7 @@ function ToolDetail() {
     );
   }
 
-  if (error || !app) {
+  if (error || !shownApp) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-24 text-center">
         <h1 className="font-display text-4xl">Tool not found</h1>
@@ -93,6 +120,7 @@ function ToolDetail() {
     );
   }
 
+  const app = shownApp;
   const avgRating = app.appReviews?.length
     ? app.appReviews.reduce((a, r) => a + r.rating, 0) / app.appReviews.length
     : 0;
