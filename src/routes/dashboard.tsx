@@ -37,7 +37,7 @@ type AppsPage = {
 };
 
 type AnalyticsData = {
-  apps: Array<{ id: string; name: string; slug: string; iconUrl: string | null; status: string; launchUrl: string | null }>;
+  apps: AppData[];
   byApp: Record<string, Array<{ date: string; views: number }>>;
   totals: Record<string, number>;
 };
@@ -233,16 +233,16 @@ function CreatorDashboard({ user }: { user: { displayName?: string | null; email
       </div>
 
       {mode === "analytics" ? (
-        <AnalyticsView analytics={analytics} loading={analyticsLoading} live={liveData} />
+        <AnalyticsView analytics={shownAnalytics} loading={analyticsLoading && !analyticsError} live={shownLive} />
       ) : (
         <div className="mt-8">
           <div className="bg-card border border-border rounded-3xl divide-y divide-border overflow-hidden">
-            {appsLoading && (
+            {appsLoading && !appsError && (
               <div className="p-10 text-center text-muted-foreground flex items-center justify-center gap-2">
                 <Loader2 className="size-4 animate-spin" /> Loading…
               </div>
             )}
-            {!appsLoading && apps.length === 0 && (
+            {(!appsLoading || appsError) && apps.length === 0 && (
               <div className="p-10 text-center text-muted-foreground">
                 <p>No apps yet.</p>
                 <Link to="/submit" className="mt-3 inline-block font-medium hover:underline">Submit your first app →</Link>
