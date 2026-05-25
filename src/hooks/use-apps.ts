@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
-import { useStore, type Tool } from "@/lib/store";
+import { CATEGORIES, useStore, type Tool } from "@/lib/store";
 
 export type ApiApp = {
   id: string;
@@ -48,11 +48,24 @@ function toTool(app: ApiApp, categoryMap: Map<string, string>): Tool {
 }
 
 export function useCategories() {
-  return useQuery({
+  const fallbackCategories = CATEGORIES.filter((name) => name !== "All").map((name) => ({
+    id: name,
+    name,
+    slug: name.toLowerCase().replace(/\s+/g, "-"),
+  }));
+
+  const query = useQuery({
     queryKey: ["categories"],
     queryFn: () => apiFetch<ApiCategory[]>("/api/v1/categories", { skipAuth: true }),
     staleTime: 10 * 60 * 1000,
+    retry: 0,
   });
+
+  return {
+    ...query,
+    data: query.isError ? fallbackCategories : query.data,
+    isError: false,
+  };
 }
 
 export function useApps() {
