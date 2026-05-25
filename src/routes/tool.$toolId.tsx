@@ -87,7 +87,7 @@ function ToolDetail() {
   const { tools } = useStore();
   const localTool = tools.find((tool) => tool.id === toolId);
 
-  const { data: app, isLoading, error } = useQuery<ApiApp>({
+  const { data: remoteApp, isLoading, error } = useQuery<ApiApp>({
     queryKey: ["app", toolId],
     queryFn: () => apiFetch<ApiApp>(`/api/v1/apps/${toolId}`),
     staleTime: 60_000,
@@ -101,7 +101,7 @@ function ToolDetail() {
     fetch(`${API_BASE_URL}/api/v1/apps/${toolId}/view`, { method: "POST" }).catch(() => {});
   }, [toolId]);
 
-  const shownApp = localTool ? localToolToApp(localTool) : app;
+  const shownApp = localTool ? localToolToApp(localTool) : remoteApp;
 
   if (isLoading && !shownApp) {
     return (
