@@ -295,9 +295,15 @@ export const actions = {
     emit();
   },
   syncFromAuth(data: { name: string; username: string }) {
-    state.users = state.users.map((u) =>
-      u.id === state.currentUserId ? { ...u, name: data.name, username: data.username } : u,
-    );
+    state.users = state.users.map((u) => {
+      if (u.id !== state.currentUserId) return u;
+      return {
+        ...u,
+        // Only overwrite defaults — don't clobber names the user has manually edited
+        name: u.name === "You" ? data.name : u.name,
+        username: u.username === "you" ? data.username : u.username,
+      };
+    });
     emit();
   },
   toggleLike(toolId: string) {

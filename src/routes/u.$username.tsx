@@ -1,5 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import {
   Globe,
   MessageCircle,
@@ -33,7 +33,20 @@ export const Route = createFileRoute("/u/$username")({
 function ProfilePage() {
   const { username } = Route.useParams();
   const { users, tools, comments, currentUserId } = useStore();
-  const user = users.find((u) => u.username === username);
+  const navigate = useNavigate();
+
+  // "/u/you" is the legacy self-profile URL — fall back to current user by ID
+  const user =
+    users.find((u) => u.username === username) ??
+    (username === "you" ? users.find((u) => u.id === currentUserId) : undefined);
+
+  // Once the store is synced with the real handle, redirect the URL silently
+  useEffect(() => {
+    if (username === "you" && user && user.username !== "you") {
+      void navigate({ to: "/u/$username", params: { username: user.username }, replace: true });
+    }
+  }, [username, user, navigate]);
+
   const [editing, setEditing] = useState(false);
 
   if (!user) {
