@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Rocket, Trash2, ExternalLink, Plus, TrendingUp, Eye,
-  Activity, Archive, Loader2, Shield, RefreshCw, Radio,
+  Activity, Archive, Loader2, Shield, RefreshCw, Radio, LogOut,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
@@ -57,7 +57,7 @@ type LiveData = {
 // ── Root ────────────────────────────────────────────────────────────────────
 
 function Dashboard() {
-  const { user, isAuthenticated, loading } = useAuth();
+  const { user, isAuthenticated, loading, logout } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -69,15 +69,29 @@ function Dashboard() {
   if (loading) return <LoadingState />;
   if (!isAuthenticated || !user) return null;
 
+  const handleLogout = async () => { await logout(); navigate({ to: "/" }); };
+
+  const logoutBar = (
+    <div className="md:hidden flex items-center justify-between px-4 pt-4 pb-0">
+      <span className="text-sm text-muted-foreground truncate">{user.displayName ?? user.email}</span>
+      <button
+        onClick={handleLogout}
+        className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground/70 hover:text-foreground"
+      >
+        <LogOut className="size-4" /> Log out
+      </button>
+    </div>
+  );
+
   if (user.role === "ADMIN" || user.role === "MODERATOR") {
-    return <AdminDashboard user={user} />;
+    return <>{logoutBar}<AdminDashboard user={user} /></>;
   }
 
   if (user.role === "CREATOR") {
-    return <CreatorDashboard user={user} />;
+    return <>{logoutBar}<CreatorDashboard user={user} /></>;
   }
 
-  return <UserPrompt />;
+  return <>{logoutBar}<UserPrompt /></>;
 }
 
 // ── Loading ──────────────────────────────────────────────────────────────────

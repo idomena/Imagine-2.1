@@ -42,10 +42,10 @@ export function Header() {
             </Link>
             <button
               onClick={handleLogout}
-              title="Log out"
-              className="inline-flex items-center justify-center size-9 rounded-full bg-card text-foreground sticker transition hover:-translate-y-0.5"
+              className="inline-flex items-center gap-1.5 rounded-full bg-card text-foreground px-3 py-2 text-sm font-semibold sticker transition hover:-translate-y-0.5"
             >
               <LogOut className="size-4" />
+              <span className="md:hidden">Log out</span>
             </button>
           </div>
         ) : (
