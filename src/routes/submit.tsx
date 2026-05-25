@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCategories, type ApiCategory } from "@/hooks/use-apps";
+import { CATEGORIES, actions } from "@/lib/store";
 
 export const Route = createFileRoute("/submit")({
   component: SubmitPage,
@@ -39,13 +40,20 @@ function SubmitPage() {
   const [fetching, setFetching] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
+  const categoryOptions: ApiCategory[] = categories?.length
+    ? categories
+    : CATEGORIES.filter((c) => c !== "All").map((name) => ({
+        id: name,
+        name,
+        slug: slugify(name),
+      }));
 
   // Set default category when categories load
   useEffect(() => {
-    if (categories && categories.length > 0 && !categoryId) {
-      setCategoryId(categories[0].id);
+    if (categoryOptions.length > 0 && !categoryId) {
+      setCategoryId(categoryOptions[0].id);
     }
-  }, [categories, categoryId]);
+  }, [categoryOptions, categoryId]);
 
   useEffect(() => {
     const incomingUrl = (search as Record<string, unknown>).url as string;
@@ -120,6 +128,18 @@ function SubmitPage() {
       // Slug conflict → try with a timestamp suffix
       if (msg.includes("already taken")) {
         toast.error("That name is already taken — try adding a word or number to make it unique.");
+      } else if (msg.includes("Can't reach the server") || msg.includes("Application not found") || msg.includes("404")) {
+        const selectedCategory = categoryOptions.find((c) => c.id === categoryId)?.name ?? "Productivity";
+        const tool = actions.addTool({
+          name: name.trim(),
+          tagline: tagline.trim(),
+          description: description.trim() || "A new tool from the Imagine community.",
+          url: finalUrl,
+          category: selectedCategory,
+          tags: [],
+        });
+        toast.success("Your tool was saved locally while the backend is offline.");
+        navigate({ to: "/tool/$toolId", params: { toolId: tool.id } });
       } else {
         toast.error(msg);
       }
@@ -253,12 +273,9 @@ function SubmitPage() {
             </Field>
             <Field label="Category">
               <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={inputCls}>
-                {(categories ?? []).map((c: ApiCategory) => (
+                {categoryOptions.map((c: ApiCategory) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
-                {(!categories || categories.length === 0) && (
-                  <option value="">Loading categories…</option>
-                )}
               </select>
             </Field>
             <div className="flex gap-2 pt-2">
