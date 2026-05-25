@@ -1,6 +1,27 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { apiFetch, onAuthChange, tokenStorage, type ApiUser } from "@/lib/api";
 import * as authApi from "@/lib/auth";
+import { actions } from "@/lib/store";
+
+function deriveDisplayName(email: string, displayName?: string | null): string {
+  if (displayName?.trim()) return displayName.trim();
+  return email
+    .split("@")[0]
+    .replace(/[._-]+/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim();
+}
+
+function deriveUsername(email: string): string {
+  return email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function syncUserToStore(u: ApiUser) {
+  actions.syncFromAuth({
+    name: deriveDisplayName(u.email, u.displayName),
+    username: deriveUsername(u.email),
+  });
+}
 
 type AuthContextValue = {
   user: ApiUser | null;
@@ -21,6 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Hydrate from localStorage immediately so auth state is available fast.
     const stored = tokenStorage.getUser();
     setUser(stored);
+    if (stored) syncUserToStore(stored);
 
     // If a token exists, fetch fresh user data (includes displayName, role, avatarUrl)
     // and update localStorage so stale data is replaced silently.
@@ -33,6 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             user: fresh,
           });
           setUser(fresh);
+          syncUserToStore(fresh);
         })
         .catch(() => {
           // Token expired or invalid — leave user as-is; refresh will handle it

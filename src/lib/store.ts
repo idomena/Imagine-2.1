@@ -294,6 +294,12 @@ export const actions = {
     );
     emit();
   },
+  syncFromAuth(data: { name: string; username: string }) {
+    state.users = state.users.map((u) =>
+      u.id === state.currentUserId ? { ...u, name: data.name, username: data.username } : u,
+    );
+    emit();
+  },
   toggleLike(toolId: string) {
     const next = new Set(state.liked);
     if (next.has(toolId)) next.delete(toolId);
