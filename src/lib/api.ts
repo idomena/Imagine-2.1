@@ -117,7 +117,10 @@ async function rawFetch<T>(path: string, opts: ApiFetchOptions = {}): Promise<T>
 
   let res: Response;
   try {
-    res = await fetch(`${API_BASE_URL}${path}`, init);
+    res = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      signal: init.signal ?? AbortSignal.timeout(12_000),
+    });
   } catch (e) {
     throw new ApiError(
       "Can't reach the server. Check your connection or try again in a moment.",
