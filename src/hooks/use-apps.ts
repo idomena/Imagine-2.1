@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
-import { CATEGORIES, useStore, type Tool } from "@/lib/store";
+import { CATEGORIES, type Tool } from "@/lib/store";
 
 export type ApiApp = {
   id: string;
@@ -70,7 +70,6 @@ export function useCategories() {
 
 export function useApps() {
   const { data: categories } = useCategories();
-  const localState = useStore();
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["apps"],
@@ -86,20 +85,17 @@ export function useApps() {
     (categories ?? []).map((c: ApiCategory) => [c.id, c.name]),
   );
 
-  // Backend unreachable / errored → fall back to local demo tools so the app
-  // remains usable while the backend is being fixed.
-  const usingFallback = isError;
-  const tools: Tool[] = usingFallback
-    ? localState.tools
+  const tools: Tool[] = isError
+    ? []
     : (data?.items ?? []).map((app) => toTool(app, categoryMap));
 
   return {
     tools,
-    isLoading: isLoading && !usingFallback,
+    isLoading: isLoading && !isError,
     isError: false,
-    usingFallback,
+    usingFallback: false,
     backendError: error instanceof Error ? error.message : null,
-    total: usingFallback ? localState.tools.length : (data?.total ?? 0),
+    total: data?.total ?? 0,
   };
 }
 

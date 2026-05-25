@@ -1,43 +1,23 @@
-import { Link, useRouterState } from "@tanstack/react-router";
-import { Compass, TrendingUp, Plus, BarChart3, User as UserIcon, LogIn } from "lucide-react";
+import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
+import { Compass, TrendingUp, Plus, BarChart3, LogIn, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 export function MobileNav() {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
+  const navigate = useNavigate();
   const is = (p: string) => pathname === p;
 
-  const avatarEl = isAuthenticated && user ? (
-    user.avatarUrl
-      ? (
-        <img
-          src={user.avatarUrl}
-          alt=""
-          className="size-7 rounded-full object-cover ring-2 ring-background"
-        />
-      )
-      : (() => {
-          const name = user.displayName ?? user.email;
-          const hue = name.split("").reduce((n, c) => n + c.charCodeAt(0), 0) % 360;
-          return (
-            <span
-              className="grid place-items-center size-7 rounded-full text-[11px] font-bold text-white ring-2 ring-background"
-              style={{ background: `oklch(0.65 0.18 ${hue})` }}
-            >
-              {name.slice(0, 2).toUpperCase()}
-            </span>
-          );
-        })()
-  ) : <UserIcon className="size-5" />;
-
-  const youActive = pathname.startsWith("/u/") || is("/dashboard");
+  const handleLogout = async () => {
+    await logout();
+    navigate({ to: "/" });
+  };
 
   return (
     <nav
       className="md:hidden fixed bottom-0 inset-x-0 z-40 pb-[env(safe-area-inset-bottom)]"
       aria-label="Primary"
     >
-      {/* frosted glass bar */}
       <div className="bg-background/85 border-t border-border/60 backdrop-blur-2xl">
         <div className="relative mx-auto max-w-md grid grid-cols-5 items-center px-1 h-[62px]">
 
@@ -62,12 +42,17 @@ export function MobileNav() {
           <NavItem to="/dashboard" active={is("/dashboard")} icon={<BarChart3 className="size-5" />} label="Dashboard" />
 
           {isAuthenticated ? (
-            <NavItem
-              to="/dashboard"
-              active={youActive}
-              icon={avatarEl}
-              label="You"
-            />
+            <button
+              onClick={handleLogout}
+              className="flex flex-col items-center justify-center gap-1 h-full py-2 w-full"
+            >
+              <span className="flex items-center justify-center size-9 rounded-2xl text-foreground/45 hover:text-foreground/70 transition-all duration-150">
+                <LogOut className="size-5" />
+              </span>
+              <span className="text-[9.5px] font-semibold tracking-wide leading-none text-foreground/45">
+                Log out
+              </span>
+            </button>
           ) : (
             <NavItem to="/login" active={is("/login")} icon={<LogIn className="size-5" />} label="Log in" />
           )}
