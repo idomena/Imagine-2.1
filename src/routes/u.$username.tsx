@@ -15,17 +15,55 @@ import {
   Sprout,
   Star,
   Bookmark,
+  Loader2,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   useStore,
   actions,
   AVATAR_COLORS,
   AVATAR_EMOJIS,
+  type Tool,
   User,
   timeAgo,
 } from "@/lib/store";
+import { apiFetch } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 import { ToolCard } from "@/components/ToolCard";
+
+type MineApp = {
+  id: string;
+  slug: string;
+  name: string;
+  tagline: string | null;
+  description: string | null;
+  launchUrl: string | null;
+  iconUrl: string | null;
+  primaryColor: string | null;
+  status: string;
+  createdAt: string;
+};
+
+function mineAppToTool(app: MineApp, makerId: string): Tool {
+  let domain = "";
+  try { domain = new URL(app.launchUrl ?? "").hostname.replace(/^www\./, ""); } catch {}
+  return {
+    id: app.id,
+    name: app.name,
+    tagline: app.tagline ?? "",
+    description: app.description ?? "",
+    url: app.launchUrl ?? "#",
+    domain,
+    faviconUrl: app.iconUrl ?? (domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : ""),
+    coverColor: app.primaryColor ?? "oklch(0.78 0.14 175)",
+    category: "",
+    tags: [],
+    upvotes: 0,
+    makerId,
+    createdAt: new Date(app.createdAt).getTime(),
+  };
+}
 
 export const Route = createFileRoute("/u/$username")({
   component: ProfilePage,
@@ -35,11 +73,23 @@ function ProfilePage() {
   const { username } = Route.useParams();
   const { users, tools, comments, currentUserId, bookmarked, following } = useStore();
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
 
   // "/u/you" is the legacy self-profile URL — fall back to current user by ID
   const user =
     users.find((u) => u.username === username) ??
     (username === "you" ? users.find((u) => u.id === currentUserId) : undefined);
+
+  // Computed before early return so hooks stay in consistent order
+  const isMe = user?.id === currentUserId;
+
+  const { data: mineData, isLoading: mineLoading } = useQuery({
+    queryKey: ["apps", "mine"],
+    queryFn: () =>
+      apiFetch<{ items: MineApp[]; total: number }>("/api/v1/apps/mine?limit=50"),
+    enabled: isMe && isAuthenticated,
+    staleTime: 60_000,
+  });
 
   // Once the store is synced with the real handle, redirect the URL silently
   useEffect(() => {
@@ -68,15 +118,14 @@ function ProfilePage() {
     );
   }
 
-  const userTools = tools
-    .filter((t) => t.makerId === user.id)
-    .sort((a, b) => b.upvotes - a.upvotes);
+  const userTools: Tool[] = isMe && mineData?.items
+    ? mineData.items.map((app) => mineAppToTool(app, currentUserId))
+    : tools.filter((t) => t.makerId === user.id).sort((a, b) => b.upvotes - a.upvotes);
   const totalUpvotes = userTools.reduce((a, t) => a + t.upvotes, 0);
   const userComments = comments.filter((c) => c.userId === user.id);
   const commentsOnTools = comments.filter((c) =>
     userTools.some((t) => t.id === c.toolId),
   );
-  const isMe = user.id === currentUserId;
 
   const joined = useMemo(
     () =>
@@ -363,7 +412,11 @@ function ProfilePage() {
           )}
         </div>
 
-        {userTools.length === 0 ? (
+        {isMe && mineLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="size-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : userTools.length === 0 ? (
           <div className="relative bg-card border border-border border-dashed rounded-3xl p-12 text-center overflow-hidden">
             <div className="absolute inset-0 bg-dots opacity-30" />
             <div className="relative">
