@@ -1,4 +1,5 @@
 import { ApiError, apiFetch, tokenStorage, type ApiUser } from "./api";
+import { actions } from "./store";
 
 type AuthSuccess = {
   user: ApiUser;
@@ -104,4 +105,5 @@ export async function logout(): Promise<void> {
     /* ignore */
   }
   tokenStorage.clear();
+  actions.logoutUser();
 }

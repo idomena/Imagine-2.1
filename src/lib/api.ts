@@ -62,6 +62,10 @@ export const tokenStorage = {
     if (!isBrowser()) return;
     localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
   },
+  updateUser(user: ApiUser) {
+    if (!isBrowser()) return;
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+  },
   clear() {
     if (!isBrowser()) return;
     localStorage.removeItem(ACCESS_TOKEN_KEY);
@@ -163,7 +167,7 @@ async function refreshAccessToken(): Promise<string> {
   if (!refreshToken) throw new ApiError("No refresh token", 401, null);
 
   if (!refreshPromise) {
-    refreshPromise = rawFetch<{ accessToken: string; refreshToken?: string }>(
+    refreshPromise = rawFetch<{ accessToken: string; refreshToken?: string; user?: ApiUser }>(
       "/api/v1/auth/refresh",
       {
         method: "POST",
@@ -176,6 +180,9 @@ async function refreshAccessToken(): Promise<string> {
         tokenStorage.updateAccess(data.accessToken);
         if (data.refreshToken && isBrowser()) {
           localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+        }
+        if (data.user) {
+          tokenStorage.updateUser(data.user);
         }
         return data.accessToken;
       })

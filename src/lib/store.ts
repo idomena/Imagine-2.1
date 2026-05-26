@@ -303,19 +303,40 @@ export const actions = {
   syncFromAuth(data: { userId: string; name: string; username: string }) {
     const isNewUser = state.authUserId !== null && state.authUserId !== data.userId;
     state.authUserId = data.userId;
+    if (isNewUser) {
+      // Different user logged in on this browser — wipe all per-user state
+      state.upvoted    = new Set();
+      state.liked      = new Set();
+      state.bookmarked = new Set();
+      state.following  = new Set();
+      state.myReactions = {};
+    }
     state.users = state.users.map((u) => {
       if (u.id !== state.currentUserId) return u;
       return {
         ...u,
-        name: u.name === "You" || isNewUser ? data.name : u.name,
-        username: u.username === "you" || isNewUser ? data.username : u.username,
-        // Reset personal profile data when a different user logs in
-        bio: isNewUser ? "" : u.bio,
-        socials: isNewUser ? {} : u.socials,
-        emoji: isNewUser ? "✨" : u.emoji,
+        name:        u.name === "You"  || isNewUser ? data.name     : u.name,
+        username:    u.username === "you" || isNewUser ? data.username : u.username,
+        bio:         isNewUser ? "" : u.bio,
+        socials:     isNewUser ? {} : u.socials,
+        emoji:       isNewUser ? "✨" : u.emoji,
         avatarColor: isNewUser ? AVATAR_COLORS[0] : u.avatarColor,
       };
     });
+    emit();
+  },
+  logoutUser() {
+    state.authUserId  = null;
+    state.upvoted     = new Set();
+    state.liked       = new Set();
+    state.bookmarked  = new Set();
+    state.following   = new Set();
+    state.myReactions = {};
+    state.users = state.users.map((u) =>
+      u.id === state.currentUserId
+        ? { ...u, bio: "", socials: {}, emoji: "✨", avatarColor: AVATAR_COLORS[0], name: "You", username: "you" }
+        : u,
+    );
     emit();
   },
   toggleLike(toolId: string) {
