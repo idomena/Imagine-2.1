@@ -101,7 +101,9 @@ type ApiFetchOptions = Omit<RequestInit, "body"> & {
 
 async function rawFetch<T>(path: string, opts: ApiFetchOptions = {}): Promise<T> {
   const headers = new Headers(opts.headers);
-  headers.set("Content-Type", "application/json");
+  if (opts.body !== undefined) {
+    headers.set("Content-Type", "application/json");
+  }
   headers.set("Accept", "application/json");
 
   if (!opts.skipAuth) {

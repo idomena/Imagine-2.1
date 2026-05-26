@@ -93,9 +93,13 @@ export async function register(
 }
 
 export async function logout(): Promise<void> {
-  // Best-effort server logout; ignore errors.
+  // Best-effort server logout — revoke the refresh token so it can't be reused.
   try {
-    await apiFetch("/api/v1/auth/logout", { method: "POST" });
+    const refreshToken = tokenStorage.getRefresh();
+    await apiFetch("/api/v1/auth/logout", {
+      method: "POST",
+      body: { refreshToken: refreshToken ?? undefined },
+    });
   } catch {
     /* ignore */
   }
