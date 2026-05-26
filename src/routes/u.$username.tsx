@@ -14,6 +14,7 @@ import {
   Flame,
   Sprout,
   Star,
+  Bookmark,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -32,7 +33,7 @@ export const Route = createFileRoute("/u/$username")({
 
 function ProfilePage() {
   const { username } = Route.useParams();
-  const { users, tools, comments, currentUserId } = useStore();
+  const { users, tools, comments, currentUserId, bookmarked } = useStore();
   const navigate = useNavigate();
 
   // "/u/you" is the legacy self-profile URL — fall back to current user by ID
@@ -88,6 +89,10 @@ function ProfilePage() {
   const topTool = userTools[0];
   const otherTools = userTools.slice(1);
 
+  const bookmarkedTools = isMe
+    ? tools.filter((t) => bookmarked.has(t.id) && !userTools.some((u) => u.id === t.id))
+    : [];
+
   // Tiny achievement badges — friendly + motivating
   const badges: { label: string; emoji: string; got: boolean }[] = [
     { label: "First ship", emoji: "🚀", got: userTools.length >= 1 },
@@ -125,15 +130,15 @@ function ProfilePage() {
         }}
       >
         <div className="absolute inset-0 bg-dots opacity-25" />
-        {/* Floating decorative stickers */}
+        {/* Floating decorative stickers — user's own emoji */}
         <div className="absolute top-6 left-8 text-3xl rotate-[-14deg] opacity-80 select-none animate-fade-in">
-          ✨
+          {user.emoji ?? "✨"}
         </div>
         <div className="absolute top-10 right-24 text-2xl rotate-[12deg] opacity-70 select-none">
-          🌿
+          {user.emoji ?? "✨"}
         </div>
-        <div className="absolute bottom-6 left-1/3 text-2xl rotate-[-6deg] opacity-70 select-none">
-          ⭐
+        <div className="absolute bottom-6 left-1/3 text-xl rotate-[-6deg] opacity-60 select-none">
+          {user.emoji ?? "✨"}
         </div>
         <div className="absolute -bottom-3 right-4 text-7xl sm:text-9xl opacity-30 select-none">
           {user.emoji ?? "✨"}
@@ -172,6 +177,45 @@ function ProfilePage() {
                     ? "Tap edit to write a bio — what are you building?"
                     : "No bio yet.")}
               </p>
+
+              {/* Social links */}
+              {(user.socials?.instagram || user.socials?.x || user.socials?.linkedin) && (
+                <div className="mt-3 flex items-center gap-2 flex-wrap">
+                  {user.socials?.instagram && (
+                    <a
+                      href={`https://instagram.com/${user.socials.instagram}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-background border border-border text-xs font-semibold hover:bg-muted hover:-translate-y-0.5 transition sticker"
+                    >
+                      <span className="text-sm leading-none">📸</span>
+                      @{user.socials.instagram}
+                    </a>
+                  )}
+                  {user.socials?.x && (
+                    <a
+                      href={`https://x.com/${user.socials.x}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-background border border-border text-xs font-semibold hover:bg-muted hover:-translate-y-0.5 transition sticker"
+                    >
+                      <span className="text-sm font-bold leading-none">𝕏</span>
+                      @{user.socials.x}
+                    </a>
+                  )}
+                  {user.socials?.linkedin && (
+                    <a
+                      href={`https://linkedin.com/in/${user.socials.linkedin}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-background border border-border text-xs font-semibold hover:bg-muted hover:-translate-y-0.5 transition sticker"
+                    >
+                      <Globe className="size-3" />
+                      {user.socials.linkedin}
+                    </a>
+                  )}
+                </div>
+              )}
 
               <div className="mt-5 flex items-center gap-2 flex-wrap">
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-mint-soft text-foreground text-xs font-semibold">
@@ -379,6 +423,21 @@ function ProfilePage() {
                   </Link>
                 );
               })}
+          </div>
+        </section>
+      )}
+
+      {/* ---------- Bookmarks (owner only) ---------- */}
+      {isMe && bookmarkedTools.length > 0 && (
+        <section className="mt-12 px-2 sm:px-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Bookmark className="size-4 text-mint" />
+            <h2 className="font-display text-2xl">Saved</h2>
+          </div>
+          <div className="grid md:grid-cols-2 gap-4">
+            {bookmarkedTools.map((t) => (
+              <ToolCard key={t.id} tool={t} />
+            ))}
           </div>
         </section>
       )}
