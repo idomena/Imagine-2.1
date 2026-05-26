@@ -1,14 +1,14 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Compass, TrendingUp, Plus, BarChart3, LogIn, User } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-
-function deriveUsername(email: string): string {
-  return email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "");
-}
+import { useStore } from "@/lib/store";
 
 export function MobileNav() {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated } = useAuth();
+  const { users: storeUsers, currentUserId } = useStore();
+  const storeUser = storeUsers.find((u) => u.id === currentUserId);
+  const profileUsername = storeUser?.username ?? "you";
   const is = (p: string) => pathname === p;
 
   return (
@@ -39,10 +39,10 @@ export function MobileNav() {
 
           <NavItem to="/dashboard" active={is("/dashboard")} icon={<BarChart3 className="size-5" />} label="Dashboard" />
 
-          {isAuthenticated && user ? (
+          {isAuthenticated ? (
             <Link
               to="/u/$username"
-              params={{ username: deriveUsername(user.email) }}
+              params={{ username: profileUsername }}
               className="flex flex-col items-center justify-center gap-1 h-full py-2"
             >
               <span className={`flex items-center justify-center size-9 rounded-2xl transition-all duration-150 ${

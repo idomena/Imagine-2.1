@@ -133,6 +133,7 @@ type State = {
   questions: Question[];
   users: User[];
   currentUserId: string;
+  authUserId: string | null;   // the API user ID of whoever is logged in
   upvoted: Set<string>;
   liked: Set<string>;
   bookmarked: Set<string>;
@@ -147,7 +148,8 @@ const STORAGE_KEY = "toolyard:v1";
 function load(): State {
   const base: State = {
     tools: initialTools, comments: initialComments, reviews: initialReviews, questions: initialQuestions,
-    users, currentUserId: "u4", upvoted: new Set(), liked: new Set(), bookmarked: new Set(), following: new Set(),
+    users, currentUserId: "u4", authUserId: null,
+    upvoted: new Set(), liked: new Set(), bookmarked: new Set(), following: new Set(),
     reactions: { t1: { "🔥": 12, "💎": 4, "😍": 7 }, t3: { "👏": 9, "🧠": 3 } },
     myReactions: {}, mode: "user",
   };
@@ -163,6 +165,7 @@ function load(): State {
         questions: parsed.questions ?? initialQuestions,
         users: parsed.users ?? users,
         currentUserId: parsed.currentUserId ?? "u4",
+        authUserId: parsed.authUserId ?? null,
         upvoted: new Set(parsed.upvoted ?? []),
         liked: new Set(parsed.liked ?? []),
         bookmarked: new Set(parsed.bookmarked ?? []),
@@ -187,6 +190,7 @@ function persist() {
     STORAGE_KEY,
     JSON.stringify({
       ...state,
+      authUserId: state.authUserId,
       upvoted: Array.from(state.upvoted),
       liked: Array.from(state.liked),
       bookmarked: Array.from(state.bookmarked),
@@ -296,14 +300,20 @@ export const actions = {
     );
     emit();
   },
-  syncFromAuth(data: { name: string; username: string }) {
+  syncFromAuth(data: { userId: string; name: string; username: string }) {
+    const isNewUser = state.authUserId !== null && state.authUserId !== data.userId;
+    state.authUserId = data.userId;
     state.users = state.users.map((u) => {
       if (u.id !== state.currentUserId) return u;
       return {
         ...u,
-        // Only overwrite defaults — don't clobber names the user has manually edited
-        name: u.name === "You" ? data.name : u.name,
-        username: u.username === "you" ? data.username : u.username,
+        name: u.name === "You" || isNewUser ? data.name : u.name,
+        username: u.username === "you" || isNewUser ? data.username : u.username,
+        // Reset personal profile data when a different user logs in
+        bio: isNewUser ? "" : u.bio,
+        socials: isNewUser ? {} : u.socials,
+        emoji: isNewUser ? "✨" : u.emoji,
+        avatarColor: isNewUser ? AVATAR_COLORS[0] : u.avatarColor,
       };
     });
     emit();

@@ -18,6 +18,7 @@ function deriveUsername(email: string): string {
 
 function syncUserToStore(u: ApiUser) {
   actions.syncFromAuth({
+    userId: u.id,
     name: deriveDisplayName(u.email, u.displayName),
     username: deriveUsername(u.email),
   });

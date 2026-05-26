@@ -1,10 +1,7 @@
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import { Plus, LogOut, LogIn } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-
-function deriveUsername(email: string): string {
-  return email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "");
-}
+import { useStore } from "@/lib/store";
 import logo from "@/assets/logo.png";
 
 export function Header() {
@@ -12,6 +9,9 @@ export function Header() {
   const isActive = (p: string) => pathname === p;
   const { user, isAuthenticated, logout } = useAuth();
   const router = useRouter();
+  const { users: storeUsers, currentUserId } = useStore();
+  const storeUser = storeUsers.find((u) => u.id === currentUserId);
+  const profileUsername = storeUser?.username ?? "you";
 
   const handleLogout = async () => {
     await logout();
@@ -43,7 +43,7 @@ export function Header() {
           <div className="ml-1 flex items-center gap-2">
             <Link
               to="/u/$username"
-              params={{ username: deriveUsername(user.email) }}
+              params={{ username: profileUsername }}
               title={user.displayName ?? user.email}
             >
               <UserAvatar user={user} />
