@@ -246,8 +246,11 @@ function ToolDetail() {
 
   useEffect(() => {
     if (!toolId) return;
-    fetch(`${API_BASE_URL}/api/v1/apps/${toolId}/view`, {
+    fetch(`${API_BASE_URL}/api/v1/track-view`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ projectId: toolId }),
     }).catch(() => {});
   }, [toolId]);
 

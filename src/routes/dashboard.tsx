@@ -7,7 +7,6 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
-import { useStore, type Tool } from "@/lib/store";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard")({
@@ -123,57 +122,28 @@ function UserPrompt() {
 
 // ── Creator Dashboard ────────────────────────────────────────────────────────
 
-function localToolToApp(tool: Tool): AppData {
-  return {
-    id: tool.id,
-    name: tool.name,
-    tagline: tool.tagline,
-    slug: tool.id,
-    launchUrl: tool.url,
-    iconUrl: tool.faviconUrl,
-    status: "PUBLISHED",
-    createdAt: new Date(tool.createdAt).toISOString(),
-    publishedAt: new Date(tool.createdAt).toISOString(),
-  };
-}
-
-function localAnalytics(tools: Tool[]): AnalyticsData {
-  const byApp: AnalyticsData["byApp"] = {};
-  const totals: AnalyticsData["totals"] = {};
-  tools.forEach((tool, index) => {
-    const total = Math.max(12, tool.upvotes * 8 + index * 11);
-    totals[tool.id] = total;
-    byApp[tool.id] = Array.from({ length: 30 }, (_, day) => ({
-      date: new Date(Date.now() - (29 - day) * 86_400_000).toISOString().slice(0, 10),
-      views: Math.max(0, Math.round(total / 30 + Math.sin(day + index) * 4)),
-    }));
-  });
-  return { apps: tools.map(localToolToApp), byApp, totals };
-}
-
 function CreatorDashboard({ user }: { user: { displayName?: string | null; email: string } }) {
   const [mode, setMode] = useState<"apps" | "analytics">("analytics");
   const queryClient = useQueryClient();
-  const localState = useStore();
 
-  const { data: appsPage, isLoading: appsLoading, isError: appsError } = useQuery({
+  const { data: appsPage, isLoading: appsLoading } = useQuery({
     queryKey: ["mine-apps"],
     queryFn: () => apiFetch<AppsPage>("/api/v1/apps/mine?limit=50&page=1"),
-    retry: 0,
+    retry: 1,
   });
 
-  const { data: analytics, isLoading: analyticsLoading, isError: analyticsError } = useQuery({
+  const { data: analytics, isLoading: analyticsLoading } = useQuery({
     queryKey: ["mine-analytics"],
     queryFn: () => apiFetch<AnalyticsData>("/api/v1/apps/mine/analytics"),
     refetchInterval: 30_000,
-    retry: 0,
+    retry: 1,
   });
 
-  const { data: liveData, isError: liveError } = useQuery({
+  const { data: liveData } = useQuery({
     queryKey: ["mine-live"],
     queryFn: () => apiFetch<LiveData>("/api/v1/apps/mine/live"),
     refetchInterval: 15_000,
-    retry: 0,
+    retry: 1,
   });
 
   const deleteMutation = useMutation({
@@ -195,10 +165,9 @@ function CreatorDashboard({ user }: { user: { displayName?: string | null; email
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const fallbackAnalytics = useMemo(() => localAnalytics(localState.tools), [localState.tools]);
-  const apps = appsError ? fallbackAnalytics.apps : (appsPage?.items ?? []);
-  const shownAnalytics = analyticsError ? fallbackAnalytics : analytics;
-  const shownLive = liveError ? { activeCount: Math.min(3, apps.length), recentEvents: [] } : liveData;
+  const apps = appsPage?.items ?? [];
+  const shownAnalytics = analytics;
+  const shownLive = liveData ?? { activeCount: 0, recentEvents: [] };
   const name = user.displayName?.split(" ")[0] ?? user.email.split("@")[0];
 
   return (
