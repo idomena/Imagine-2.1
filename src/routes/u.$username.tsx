@@ -15,7 +15,6 @@ import {
   Sprout,
   Star,
   Bookmark,
-  Loader2,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -118,9 +117,21 @@ function ProfilePage() {
     );
   }
 
-  const userTools: Tool[] = isMe && mineData?.items
+  // Local store tools for this user (immediately available, includes offline-submitted apps)
+  const storeUserTools = tools
+    .filter((t) => t.makerId === user.id)
+    .sort((a, b) => b.upvotes - a.upvotes);
+
+  // API tools (fetched when viewing own profile) — UUIDs never overlap with store IDs
+  const apiUserTools: Tool[] = isMe && mineData?.items?.length
     ? mineData.items.map((app) => mineAppToTool(app, currentUserId))
-    : tools.filter((t) => t.makerId === user.id).sort((a, b) => b.upvotes - a.upvotes);
+    : [];
+
+  // Merge: API tools first (canonical), then any local-only tools not yet in the API
+  const apiIds = new Set(apiUserTools.map((t) => t.id));
+  const userTools: Tool[] = isMe
+    ? [...apiUserTools, ...storeUserTools.filter((t) => !apiIds.has(t.id))]
+    : storeUserTools;
   const totalUpvotes = userTools.reduce((a, t) => a + t.upvotes, 0);
   const userComments = comments.filter((c) => c.userId === user.id);
   const commentsOnTools = comments.filter((c) =>
@@ -412,11 +423,7 @@ function ProfilePage() {
           )}
         </div>
 
-        {isMe && mineLoading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="size-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : userTools.length === 0 ? (
+        {userTools.length === 0 ? (
           <div className="relative bg-card border border-border border-dashed rounded-3xl p-12 text-center overflow-hidden">
             <div className="absolute inset-0 bg-dots opacity-30" />
             <div className="relative">
