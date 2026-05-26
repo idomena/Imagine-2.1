@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Rocket, Trash2, ExternalLink, Plus, TrendingUp, Eye,
-  Activity, Archive, Loader2, Shield, RefreshCw, Radio, LogOut,
+  Activity, Archive, Loader2, Shield, RefreshCw, LogOut,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
@@ -39,18 +39,7 @@ type AnalyticsData = {
   apps: AppData[];
   byApp: Record<string, Array<{ date: string; views: number }>>;
   totals: Record<string, number>;
-};
-
-type LiveEvent = {
-  id: string;
-  createdAt: string;
-  userAgent: string | null;
-  app: { name: string; iconUrl: string | null; slug: string };
-};
-
-type LiveData = {
-  activeCount: number;
-  recentEvents: LiveEvent[];
+  allTimeTotals?: Record<string, number>;
 };
 
 // ── Root ────────────────────────────────────────────────────────────────────
@@ -139,12 +128,6 @@ function CreatorDashboard({ user }: { user: { displayName?: string | null; email
     retry: 1,
   });
 
-  const { data: liveData } = useQuery({
-    queryKey: ["mine-live"],
-    queryFn: () => apiFetch<LiveData>("/api/v1/apps/mine/live"),
-    refetchInterval: 15_000,
-    retry: 1,
-  });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiFetch(`/api/v1/apps/${id}`, { method: "DELETE" }),
@@ -167,7 +150,6 @@ function CreatorDashboard({ user }: { user: { displayName?: string | null; email
 
   const apps = appsPage?.items ?? [];
   const shownAnalytics = analytics;
-  const shownLive = liveData ?? { activeCount: 0, recentEvents: [] };
   const name = user.displayName?.split(" ")[0] ?? user.email.split("@")[0];
 
   return (
@@ -216,7 +198,7 @@ function CreatorDashboard({ user }: { user: { displayName?: string | null; email
       </div>
 
       {mode === "analytics" ? (
-        <AnalyticsView analytics={shownAnalytics} loading={analyticsLoading} live={shownLive} />
+        <AnalyticsView analytics={shownAnalytics} loading={analyticsLoading} />
       ) : (
         <div className="mt-8">
           <div className="bg-card border border-border rounded-3xl divide-y divide-border overflow-hidden">
@@ -326,14 +308,15 @@ const PERIODS = [
 ] as const;
 type Period = typeof PERIODS[number]["label"];
 
-function AnalyticsView({ analytics, loading, live }: { analytics: AnalyticsData | undefined; loading: boolean; live?: LiveData }) {
+function AnalyticsView({ analytics, loading }: { analytics: AnalyticsData | undefined; loading: boolean }) {
   const [period, setPeriod] = useState<Period>("30d");
   const periodDays = PERIODS.find(p => p.label === period)!.days;
 
-  const totalViews = useMemo(() =>
-    analytics ? Object.values(analytics.totals).reduce((a, b) => a + b, 0) : 0,
-    [analytics]
-  );
+  const totalViews = useMemo(() => {
+    if (!analytics) return 0;
+    const src = analytics.allTimeTotals ?? analytics.totals;
+    return Object.values(src).reduce((a, b) => a + b, 0);
+  }, [analytics]);
 
   const combinedSeries = useMemo(() => {
     const days: string[] = [];
@@ -366,21 +349,10 @@ function AnalyticsView({ analytics, loading, live }: { analytics: AnalyticsData 
   return (
     <div className="mt-8 space-y-4">
       {/* Stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard icon={<Eye className="size-5" />} label="Total views" value={totalViews} tone="mint" />
+      <div className="grid grid-cols-3 gap-3">
+        <StatCard icon={<Eye className="size-5" />} label="Total visits" value={totalViews} tone="mint" />
         <StatCard icon={<Activity className="size-5" />} label="Last 30 days" value={periodViews} tone="primary" />
         <StatCard icon={<Rocket className="size-5" />} label="Apps live" value={apps.filter(a => a.status === "PUBLISHED").length} tone="default" />
-        <StatCard
-          icon={
-            <span className="relative flex size-2.5">
-              <span className="absolute inset-0 rounded-full bg-mint animate-ping opacity-75" />
-              <span className="relative rounded-full bg-mint size-2.5" />
-            </span>
-          }
-          label="Live now"
-          value={live?.activeCount ?? 0}
-          tone="default"
-        />
       </div>
 
       {/* Traffic chart */}
@@ -415,93 +387,53 @@ function AnalyticsView({ analytics, loading, live }: { analytics: AnalyticsData 
         )}
       </div>
 
-      {/* Tool performance + Live feed side by side on desktop */}
-      <div className="grid sm:grid-cols-[1fr,320px] gap-4">
-        {/* Tool performance */}
-        <div className="bg-card border border-border rounded-3xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-            <h3 className="font-display text-lg">Tool performance</h3>
-            <span className="text-xs text-muted-foreground">Click to view public page</span>
-          </div>
-          {apps.length === 0 ? (
-            <div className="px-5 py-10 text-center text-muted-foreground text-sm">No apps tracked yet.</div>
-          ) : (
-            <div className="divide-y divide-border">
-              {apps.map(app => {
-                const views = totals[app.id] ?? 0;
-                const pct = Math.round((views / maxTotal) * 100);
-                return (
-                  <div key={app.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-muted/40 transition group">
-                    <div className="size-9 rounded-xl bg-muted grid place-items-center shrink-0 overflow-hidden">
-                      {app.iconUrl
-                        ? <img src={app.iconUrl} className="size-5 rounded" alt="" />
-                        : <Rocket className="size-4 text-muted-foreground" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <span className="font-semibold text-sm truncate">{app.name}</span>
-                        <span className="text-sm tabular-nums text-muted-foreground shrink-0">{views.toLocaleString()}</span>
-                      </div>
-                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-mint transition-all duration-500"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-                    {app.launchUrl && (
-                      <a
-                        href={app.launchUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="shrink-0 opacity-0 group-hover:opacity-100 transition text-muted-foreground hover:text-foreground"
-                      >
-                        <ExternalLink className="size-3.5" />
-                      </a>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+      {/* Tool performance */}
+      <div className="bg-card border border-border rounded-3xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+          <h3 className="font-display text-lg">Tool performance</h3>
+          <span className="text-xs text-muted-foreground">All-time visits per app</span>
         </div>
-
-        {/* Live feed */}
-        <div className="bg-card border border-border rounded-3xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="relative flex size-2">
-                <span className="absolute inset-0 rounded-full bg-mint animate-ping opacity-60" />
-                <span className="relative rounded-full bg-mint size-2" />
-              </span>
-              <h3 className="font-display text-lg">Live now</h3>
-            </div>
-            <span className="text-xs text-muted-foreground flex items-center gap-1">
-              <Radio className="size-3" /> 15s
-            </span>
-          </div>
-          {!live || live.recentEvents.length === 0 ? (
-            <div className="px-5 py-10 text-center text-muted-foreground text-sm">No visitors in the last 5 minutes.</div>
-          ) : (
-            <div className="divide-y divide-border">
-              {live.recentEvents.map(ev => (
-                <div key={ev.id} className="flex items-center gap-3 px-5 py-3">
-                  <div className="size-7 rounded-lg bg-muted grid place-items-center shrink-0 overflow-hidden">
-                    {ev.app.iconUrl
-                      ? <img src={ev.app.iconUrl} className="size-4 rounded" alt="" />
-                      : <Rocket className="size-3.5 text-muted-foreground" />}
+        {apps.length === 0 ? (
+          <div className="px-5 py-10 text-center text-muted-foreground text-sm">No apps tracked yet.</div>
+        ) : (
+          <div className="divide-y divide-border">
+            {apps.map(app => {
+              const views = (analytics?.allTimeTotals ?? analytics?.totals ?? {})[app.id] ?? 0;
+              const pct = Math.round((views / maxTotal) * 100);
+              return (
+                <div key={app.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-muted/40 transition group">
+                  <div className="size-9 rounded-xl bg-muted grid place-items-center shrink-0 overflow-hidden">
+                    {app.iconUrl
+                      ? <img src={app.iconUrl} className="size-5 rounded" alt="" />
+                      : <Rocket className="size-4 text-muted-foreground" />}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <span className="text-sm font-semibold truncate block">{ev.app.name}</span>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="font-semibold text-sm truncate">{app.name}</span>
+                      <span className="text-sm tabular-nums text-muted-foreground shrink-0">{views.toLocaleString()}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-mint transition-all duration-500"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
                   </div>
-                  <span className="text-xs text-muted-foreground tabular-nums shrink-0">
-                    {timeAgo(ev.createdAt)}
-                  </span>
+                  {app.launchUrl && (
+                    <a
+                      href={app.launchUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 opacity-0 group-hover:opacity-100 transition text-muted-foreground hover:text-foreground"
+                    >
+                      <ExternalLink className="size-3.5" />
+                    </a>
+                  )}
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
