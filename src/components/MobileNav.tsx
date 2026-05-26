@@ -1,17 +1,15 @@
-import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { Compass, TrendingUp, Plus, BarChart3, LogIn, LogOut } from "lucide-react";
+import { Link, useRouterState } from "@tanstack/react-router";
+import { Compass, TrendingUp, Plus, BarChart3, LogIn, User } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+
+function deriveUsername(email: string): string {
+  return email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "");
+}
 
 export function MobileNav() {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
-  const { isAuthenticated, logout } = useAuth();
-  const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth();
   const is = (p: string) => pathname === p;
-
-  const handleLogout = async () => {
-    await logout();
-    navigate({ to: "/" });
-  };
 
   return (
     <nav
@@ -41,18 +39,23 @@ export function MobileNav() {
 
           <NavItem to="/dashboard" active={is("/dashboard")} icon={<BarChart3 className="size-5" />} label="Dashboard" />
 
-          {isAuthenticated ? (
-            <button
-              onClick={handleLogout}
-              className="flex flex-col items-center justify-center gap-1 h-full py-2 w-full"
+          {isAuthenticated && user ? (
+            <Link
+              to="/u/$username"
+              params={{ username: deriveUsername(user.email) }}
+              className="flex flex-col items-center justify-center gap-1 h-full py-2"
             >
-              <span className="flex items-center justify-center size-9 rounded-2xl text-foreground/45 hover:text-foreground/70 transition-all duration-150">
-                <LogOut className="size-5" />
+              <span className={`flex items-center justify-center size-9 rounded-2xl transition-all duration-150 ${
+                pathname.startsWith("/u/") ? "bg-foreground/8 text-foreground scale-105" : "text-foreground/45 hover:text-foreground/70"
+              }`}>
+                <User className="size-5" />
               </span>
-              <span className="text-[9.5px] font-semibold tracking-wide leading-none text-foreground/45">
-                Log out
+              <span className={`text-[9.5px] font-semibold tracking-wide leading-none transition-colors ${
+                pathname.startsWith("/u/") ? "text-foreground" : "text-foreground/45"
+              }`}>
+                Profile
               </span>
-            </button>
+            </Link>
           ) : (
             <NavItem to="/login" active={is("/login")} icon={<LogIn className="size-5" />} label="Log in" />
           )}

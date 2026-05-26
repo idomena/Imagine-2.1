@@ -1,10 +1,11 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowUp, MessageCircle, ExternalLink } from "lucide-react";
+import { ArrowUp, MessageCircle, ExternalLink, Bookmark } from "lucide-react";
 import { Tool, actions, useStore } from "@/lib/store";
 
 export function ToolCard({ tool, rank }: { tool: Tool; rank?: number }) {
-  const { upvoted, comments, users } = useStore();
+  const { upvoted, bookmarked, comments, users } = useStore();
   const isUp = upvoted.has(tool.id);
+  const isSaved = bookmarked.has(tool.id);
   const cCount = comments.filter((c) => c.toolId === tool.id).length;
   const maker = users.find((u) => u.id === tool.makerId);
 
@@ -60,10 +61,10 @@ export function ToolCard({ tool, rank }: { tool: Tool; rank?: number }) {
         </div>
       </div>
 
-      <div className="flex flex-col items-stretch gap-2">
+      <div className="flex flex-col items-stretch gap-1.5">
         <button
-          onClick={() => actions.toggleUpvote(tool.id)}
-          className={`flex flex-col items-center justify-center min-w-[64px] px-3 py-2 rounded-2xl transition-all sticker ${
+          onClick={(e) => { e.preventDefault(); actions.toggleUpvote(tool.id); }}
+          className={`flex flex-col items-center justify-center min-w-[56px] px-3 py-2 rounded-2xl transition-all sticker ${
             isUp
               ? "bg-primary text-foreground"
               : "bg-card text-foreground hover:-translate-y-0.5"
@@ -72,10 +73,18 @@ export function ToolCard({ tool, rank }: { tool: Tool; rank?: number }) {
           <ArrowUp className="size-4" strokeWidth={2.75} />
           <span className="font-display text-lg leading-none mt-0.5">{tool.upvotes}</span>
         </button>
-        <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-          <MessageCircle className="size-3" />
+        <button
+          onClick={(e) => { e.preventDefault(); actions.toggleBookmark(tool.id); }}
+          className={`flex items-center justify-center gap-1 py-1.5 rounded-xl transition-all text-xs font-medium ${
+            isSaved
+              ? "text-mint"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+          title={isSaved ? "Remove bookmark" : "Save"}
+        >
+          <Bookmark className={`size-3.5 ${isSaved ? "fill-mint" : ""}`} />
           <span>{cCount}</span>
-        </div>
+        </button>
       </div>
     </div>
   );

@@ -136,6 +136,7 @@ type State = {
   upvoted: Set<string>;
   liked: Set<string>;
   bookmarked: Set<string>;
+  following: Set<string>;
   reactions: Record<string, Partial<Record<ReactionEmoji, number>>>;
   myReactions: Record<string, ReactionEmoji[]>;
   mode: "user" | "founder";
@@ -146,7 +147,7 @@ const STORAGE_KEY = "toolyard:v1";
 function load(): State {
   const base: State = {
     tools: initialTools, comments: initialComments, reviews: initialReviews, questions: initialQuestions,
-    users, currentUserId: "u4", upvoted: new Set(), liked: new Set(), bookmarked: new Set(),
+    users, currentUserId: "u4", upvoted: new Set(), liked: new Set(), bookmarked: new Set(), following: new Set(),
     reactions: { t1: { "🔥": 12, "💎": 4, "😍": 7 }, t3: { "👏": 9, "🧠": 3 } },
     myReactions: {}, mode: "user",
   };
@@ -165,6 +166,7 @@ function load(): State {
         upvoted: new Set(parsed.upvoted ?? []),
         liked: new Set(parsed.liked ?? []),
         bookmarked: new Set(parsed.bookmarked ?? []),
+        following: new Set(parsed.following ?? []),
         reactions: parsed.reactions ?? base.reactions,
         myReactions: parsed.myReactions ?? {},
         mode: parsed.mode ?? "user",
@@ -188,6 +190,7 @@ function persist() {
       upvoted: Array.from(state.upvoted),
       liked: Array.from(state.liked),
       bookmarked: Array.from(state.bookmarked),
+      following: Array.from(state.following),
     }),
   );
 }
@@ -215,13 +218,12 @@ export const actions = {
   toggleUpvote(toolId: string) {
     const next = new Set(state.upvoted);
     const tool = state.tools.find((t) => t.id === toolId);
-    if (!tool) return;
     if (next.has(toolId)) {
       next.delete(toolId);
-      tool.upvotes = Math.max(0, tool.upvotes - 1);
+      if (tool) tool.upvotes = Math.max(0, tool.upvotes - 1);
     } else {
       next.add(toolId);
-      tool.upvotes += 1;
+      if (tool) tool.upvotes += 1;
     }
     state.upvoted = next;
     emit();
@@ -334,6 +336,13 @@ export const actions = {
     }
     state.reactions = { ...state.reactions, [toolId]: bucket };
     state.myReactions = { ...state.myReactions, [toolId]: Array.from(mine) };
+    emit();
+  },
+  toggleFollow(userId: string) {
+    const next = new Set(state.following);
+    if (next.has(userId)) next.delete(userId);
+    else next.add(userId);
+    state.following = next;
     emit();
   },
 };

@@ -12,12 +12,14 @@ import {
   Eye,
   Send,
   ExternalLink,
+  Bookmark,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiFetch, API_BASE_URL } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { useStore, actions, REACTION_EMOJIS, type ReactionEmoji } from "@/lib/store";
 
 export const Route = createFileRoute("/tool/$toolId")({
   component: ToolDetail,
@@ -207,6 +209,7 @@ function ToolDetail() {
   const { toolId } = Route.useParams();
   const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
+  const { upvoted, bookmarked, reactions, myReactions } = useStore();
 
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewComment, setReviewComment] = useState("");
@@ -284,6 +287,12 @@ function ToolDetail() {
     (a) => a.type === "SCREENSHOT"
   );
   const tags = app.tags ?? [];
+  const isUpvoted = upvoted.has(toolId);
+  const isBookmarked = bookmarked.has(toolId);
+  const appReactions = reactions[toolId] ?? {};
+  const myAppReactions = new Set<ReactionEmoji>(
+    (myReactions[toolId] ?? []) as ReactionEmoji[]
+  );
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:py-10 pb-44 md:pb-20">
@@ -393,6 +402,32 @@ function ToolDetail() {
                   </span>
                 ))}
               </div>
+
+              {/* Upvote + Bookmark */}
+              <div className="mt-4 flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => actions.toggleUpvote(toolId)}
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-full font-semibold text-sm transition sticker hover:-translate-y-0.5 ${
+                    isUpvoted
+                      ? "bg-primary text-foreground"
+                      : "bg-card border border-border text-foreground"
+                  }`}
+                >
+                  <ArrowUp className="size-4" strokeWidth={2.75} />
+                  {isUpvoted ? "Upvoted" : "Upvote"}
+                </button>
+                <button
+                  onClick={() => actions.toggleBookmark(toolId)}
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-full font-semibold text-sm transition sticker hover:-translate-y-0.5 ${
+                    isBookmarked
+                      ? "bg-mint-soft text-mint border border-mint/30"
+                      : "bg-card border border-border text-foreground"
+                  }`}
+                >
+                  <Bookmark className={`size-4 ${isBookmarked ? "fill-mint" : ""}`} />
+                  {isBookmarked ? "Saved" : "Save"}
+                </button>
+              </div>
             </div>
 
             {/* Desktop visit button */}
@@ -413,6 +448,28 @@ function ToolDetail() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* ── Reactions ─────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2 flex-wrap mb-6">
+        {REACTION_EMOJIS.map((emoji) => {
+          const count = appReactions[emoji] ?? 0;
+          const active = myAppReactions.has(emoji);
+          return (
+            <button
+              key={emoji}
+              onClick={() => actions.toggleReaction(toolId, emoji)}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-semibold transition sticker hover:-translate-y-0.5 ${
+                active
+                  ? "bg-primary text-foreground"
+                  : "bg-card border border-border text-foreground/80 hover:text-foreground"
+              }`}
+            >
+              <span>{emoji}</span>
+              {count > 0 && <span className="text-xs tabular-nums">{count}</span>}
+            </button>
+          );
+        })}
       </div>
 
       {/* ── Screenshots ───────────────────────────────────────────────────── */}

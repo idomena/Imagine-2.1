@@ -1,6 +1,10 @@
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import { Plus, LogOut, LogIn } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+
+function deriveUsername(email: string): string {
+  return email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "");
+}
 import logo from "@/assets/logo.png";
 
 export function Header() {
@@ -37,7 +41,11 @@ export function Header() {
 
         {isAuthenticated && user ? (
           <div className="ml-1 flex items-center gap-2">
-            <Link to="/dashboard" title={user.displayName ?? user.email}>
+            <Link
+              to="/u/$username"
+              params={{ username: deriveUsername(user.email) }}
+              title={user.displayName ?? user.email}
+            >
               <UserAvatar user={user} />
             </Link>
             <button

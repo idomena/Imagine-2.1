@@ -33,7 +33,7 @@ export const Route = createFileRoute("/u/$username")({
 
 function ProfilePage() {
   const { username } = Route.useParams();
-  const { users, tools, comments, currentUserId, bookmarked } = useStore();
+  const { users, tools, comments, currentUserId, bookmarked, following } = useStore();
   const navigate = useNavigate();
 
   // "/u/you" is the legacy self-profile URL — fall back to current user by ID
@@ -239,10 +239,15 @@ function ProfilePage() {
                   </button>
                 ) : (
                   <button
-                    onClick={() => toast("Follows are coming soon ✨")}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-foreground text-background text-xs font-semibold sticker hover:-translate-y-0.5 transition"
+                    onClick={() => actions.toggleFollow(user.id)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold sticker hover:-translate-y-0.5 transition ${
+                      following.has(user.id)
+                        ? "bg-mint-soft text-mint border border-mint/30"
+                        : "bg-foreground text-background"
+                    }`}
                   >
-                    <Heart className="size-3" /> Follow
+                    <Heart className={`size-3 ${following.has(user.id) ? "fill-mint" : ""}`} />
+                    {following.has(user.id) ? "Following" : "Follow"}
                   </button>
                 )}
               </div>
