@@ -193,6 +193,73 @@ async function refreshAccessToken(): Promise<string> {
   return refreshPromise;
 }
 
+// ---------- multipart upload (FormData — do NOT set Content-Type) ----------
+export async function apiUpload<T = unknown>(
+  path: string,
+  formData: FormData,
+  timeoutMs = 120_000,
+): Promise<T> {
+  const makeRequest = async (): Promise<Response> => {
+    const headers = new Headers({ Accept: "application/json" });
+    const token = tokenStorage.getAccess();
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    return fetch(`${API_BASE_URL}${path}`, {
+      method: "POST",
+      headers,
+      body: formData,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  };
+
+  let res: Response;
+  try {
+    res = await makeRequest();
+  } catch (e) {
+    throw new ApiError(
+      "Can't reach the server. Check your connection or try again in a moment.",
+      0,
+      { cause: e instanceof Error ? e.message : String(e) },
+    );
+  }
+
+  if (res.status === 401 && tokenStorage.getRefresh()) {
+    try {
+      await refreshAccessToken();
+      try {
+        res = await makeRequest();
+      } catch (e) {
+        throw new ApiError("Can't reach the server.", 0, {});
+      }
+    } catch {
+      tokenStorage.clear();
+      throw new ApiError("Session expired. Please sign in again.", 401, null);
+    }
+  }
+
+  let payload: any = null;
+  const text = await res.text();
+  if (text) {
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      payload = { message: text };
+    }
+  }
+
+  if (!res.ok) {
+    const message =
+      payload?.error?.message ||
+      payload?.message ||
+      `Upload failed (${res.status})`;
+    throw new ApiError(message, res.status, payload);
+  }
+
+  if (payload && typeof payload === "object" && "data" in payload) {
+    return payload.data as T;
+  }
+  return payload as T;
+}
+
 export async function apiFetch<T>(path: string, opts: ApiFetchOptions = {}): Promise<T> {
   try {
     return await rawFetch<T>(path, opts);

@@ -6,6 +6,8 @@ import { useStore } from "@/lib/store";
 import { useApps, useCategories } from "@/hooks/use-apps";
 import { ToolCard } from "@/components/ToolCard";
 import { CloudsBackground } from "@/components/CloudsBackground";
+import { apiFetch } from "@/lib/api";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({
   component: Home,
@@ -200,14 +202,35 @@ function UrlPasteBar() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const u = normalize(url);
-    if (!u) return;
+    if (!u) return toast.error("That doesn't look like a valid URL");
     setLoading(true);
-    // Mock fetch — replace with real backend call later
-    setTimeout(() => {
-      const domain = u.hostname.replace(/^www\./, "");
+    const domain = u.hostname.replace(/^www\./, "");
+    try {
+      const meta = await apiFetch<{
+        title?: string;
+        description?: string;
+        favicon?: string | null;
+        partial?: boolean;
+      }>("/api/v1/apps/scrape", {
+        method: "POST",
+        body: { url: u.toString() },
+        skipAuth: true,
+      });
+      const title =
+        meta.title?.trim() ||
+        domain.split(".")[0].replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      setPreview({
+        url: u.toString(),
+        domain,
+        title,
+        description: meta.description?.trim() || "A tiny tool worth shipping. Add a tagline on the next step.",
+        favicon: meta.favicon || `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+      });
+    } catch {
+      // Backend unreachable — still let the user proceed with derived data.
       const title = domain.split(".")[0].replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
       setPreview({
         url: u.toString(),
@@ -216,8 +239,10 @@ function UrlPasteBar() {
         description: "A tiny tool worth shipping. Add a tagline on the next step.",
         favicon: `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
       });
+      toast.info("Couldn't reach the metadata service — you can still continue.");
+    } finally {
       setLoading(false);
-    }, 700);
+    }
   };
 
   const reset = () => {

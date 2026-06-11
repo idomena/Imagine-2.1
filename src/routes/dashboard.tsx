@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Rocket, Trash2, ExternalLink, Plus, TrendingUp, Eye,
-  Activity, Archive, Loader2, Shield, RefreshCw, LogOut,
+  Activity, Archive, Loader2, Shield, RefreshCw, LogOut, MoreHorizontal,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
@@ -155,13 +155,14 @@ function CreatorDashboard({ user }: { user: { displayName?: string | null; email
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:py-10">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5">
         <div>
-          <p className="text-sm text-muted-foreground font-medium">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">
             {apps.length} app{apps.length !== 1 ? "s" : ""} tracked
           </p>
-          <h1 className="font-display text-3xl sm:text-4xl mt-0.5">
-            Hey {name}, here's how it's going.
+          <h1 className="font-display text-4xl sm:text-5xl leading-[0.95] tracking-[-0.01em]">
+            Hey {name},<br />
+            <span className="italic text-mint">here's how it's going.</span>
           </h1>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -190,7 +191,7 @@ function CreatorDashboard({ user }: { user: { displayName?: string | null; email
           </div>
           <Link
             to="/submit"
-            className="inline-flex items-center gap-1.5 rounded-full bg-foreground text-background px-4 py-2 text-sm font-semibold hover:-translate-y-0.5 transition"
+            className="inline-flex items-center gap-1.5 rounded-full bg-foreground text-background px-4 py-2 text-sm font-semibold sticker hover:-translate-y-0.5 transition"
           >
             <Plus className="size-3.5" /> New app
           </Link>
@@ -201,84 +202,192 @@ function CreatorDashboard({ user }: { user: { displayName?: string | null; email
         <AnalyticsView analytics={shownAnalytics} loading={analyticsLoading} />
       ) : (
         <div className="mt-8">
-          <div className="bg-card border border-border rounded-3xl divide-y divide-border overflow-hidden">
-            {appsLoading && (
-              <div className="p-10 text-center text-muted-foreground flex items-center justify-center gap-2">
-                <Loader2 className="size-4 animate-spin" /> Loading…
-              </div>
-            )}
-            {!appsLoading && apps.length === 0 && (
-              <div className="p-10 text-center text-muted-foreground">
-                <p>No apps yet.</p>
-                <Link to="/submit" className="mt-3 inline-block font-medium hover:underline">Submit your first app →</Link>
-              </div>
-            )}
-            {apps.map((app) => (
-              <AppRow
-                key={app.id}
-                app={app}
-                onDelete={() => { if (confirm(`Delete "${app.name}"?`)) deleteMutation.mutate(app.id); }}
-                onArchive={() => { if (confirm(`Archive "${app.name}"? It will be hidden from public listings.`)) archiveMutation.mutate(app.id); }}
-                isDeleting={deleteMutation.isPending && deleteMutation.variables === app.id}
-                isArchiving={archiveMutation.isPending && archiveMutation.variables === app.id}
+          {/* Mini stats strip */}
+          {!analyticsLoading && analytics && apps.length > 0 && (
+            <div className="grid grid-cols-3 gap-3 mb-6">
+              <MiniStat
+                icon={<Eye className="size-4" />}
+                label="Total visits"
+                value={Object.values(analytics.allTimeTotals ?? analytics.totals).reduce((a, b) => a + b, 0)}
+                tone="mint"
               />
-            ))}
-          </div>
+              <MiniStat
+                icon={<Rocket className="size-4" />}
+                label="Apps live"
+                value={apps.filter(a => a.status === "PUBLISHED").length}
+                tone="primary"
+              />
+              <MiniStat
+                icon={<Activity className="size-4" />}
+                label="This month"
+                value={Object.values(analytics.totals).reduce((a, b) => a + b, 0)}
+                tone="default"
+              />
+            </div>
+          )}
+
+          {appsLoading && (
+            <div className="flex items-center justify-center gap-2 text-muted-foreground py-20">
+              <Loader2 className="size-5 animate-spin" /> Loading…
+            </div>
+          )}
+
+          {!appsLoading && apps.length === 0 && (
+            <div className="bg-card border border-border rounded-3xl p-12 text-center">
+              <div className="size-16 rounded-3xl bg-primary/20 grid place-items-center mx-auto mb-4">
+                <Rocket className="size-7 text-foreground/60" />
+              </div>
+              <h3 className="font-display text-2xl">No apps yet</h3>
+              <p className="text-muted-foreground mt-2 max-w-xs mx-auto text-sm">
+                Drop your first URL and have your tool live in 10 seconds.
+              </p>
+              <Link
+                to="/submit"
+                className="mt-5 inline-flex items-center gap-2 rounded-full bg-foreground text-background px-5 py-2.5 text-sm font-semibold hover:-translate-y-0.5 transition"
+              >
+                <Plus className="size-4" /> Submit your first app
+              </Link>
+            </div>
+          )}
+
+          {!appsLoading && apps.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {apps.map((app) => (
+                <AppCard
+                  key={app.id}
+                  app={app}
+                  views={(analytics?.allTimeTotals ?? analytics?.totals ?? {})[app.id] ?? null}
+                  onDelete={() => { if (confirm(`Delete "${app.name}"?`)) deleteMutation.mutate(app.id); }}
+                  onArchive={() => { if (confirm(`Archive "${app.name}"? It will be hidden from public listings.`)) archiveMutation.mutate(app.id); }}
+                  isDeleting={deleteMutation.isPending && deleteMutation.variables === app.id}
+                  isArchiving={archiveMutation.isPending && archiveMutation.variables === app.id}
+                />
+              ))}
+              {/* Submit another CTA card */}
+              <Link
+                to="/submit"
+                className="group flex flex-col items-center justify-center gap-2 rounded-3xl border-2 border-dashed border-border hover:border-foreground/30 bg-transparent hover:bg-card transition p-8 text-center"
+              >
+                <div className="size-10 rounded-2xl bg-muted group-hover:bg-primary/20 grid place-items-center transition">
+                  <Plus className="size-5 text-muted-foreground group-hover:text-foreground transition" />
+                </div>
+                <span className="text-sm font-semibold text-muted-foreground group-hover:text-foreground transition">Submit another app</span>
+              </Link>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-// ── App Row ──────────────────────────────────────────────────────────────────
+// ── App Card ─────────────────────────────────────────────────────────────────
 
-function AppRow({ app, onDelete, onArchive, isDeleting, isArchiving }: {
+function AppCard({ app, views, onDelete, onArchive, isDeleting, isArchiving }: {
   app: AppData;
+  views: number | null;
   onDelete: () => void;
   onArchive: () => void;
   isDeleting: boolean;
   isArchiving: boolean;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const canArchive = app.status === "PUBLISHED";
+  const domain = (() => { try { return new URL(app.launchUrl ?? "").hostname.replace(/^www\./, ""); } catch { return null; } })();
 
   return (
-    <div className="flex items-center gap-4 p-4 hover:bg-muted/40 transition">
-      <div className="size-12 rounded-2xl bg-muted grid place-items-center overflow-hidden shrink-0">
-        {app.iconUrl
-          ? <img src={app.iconUrl} className="size-8 rounded" alt="" />
-          : <Rocket className="size-5 text-muted-foreground" />}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="font-display text-lg truncate">{app.name}</div>
-        <div className="text-xs text-muted-foreground truncate flex items-center gap-1.5">
-          <StatusBadge status={app.status} />
-          <span>·</span>
-          <span>{app.tagline}</span>
+    <div className="group relative bg-card border border-border rounded-3xl p-5 flex flex-col gap-4 hover:shadow-pop transition-shadow">
+      {/* Top row */}
+      <div className="flex items-start gap-3">
+        <div className="size-14 rounded-2xl bg-muted border border-border grid place-items-center shrink-0 overflow-hidden">
+          {app.iconUrl
+            ? <img src={app.iconUrl} className="size-9 rounded-xl object-contain" alt="" />
+            : <Rocket className="size-6 text-muted-foreground" />}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="font-display text-xl leading-tight truncate">{app.name}</div>
+          {domain && <div className="text-xs text-mint truncate mt-0.5">{domain}</div>}
+          <div className="mt-1.5"><StatusBadge status={app.status} /></div>
+        </div>
+        {/* Actions menu */}
+        <div className="relative shrink-0">
+          <button
+            onClick={() => setMenuOpen(v => !v)}
+            className="p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition opacity-0 group-hover:opacity-100"
+          >
+            <MoreHorizontal className="size-4" />
+          </button>
+          {menuOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+              <div className="absolute right-0 top-8 z-20 bg-card border border-border rounded-2xl shadow-pop overflow-hidden min-w-36 py-1">
+                {app.launchUrl && (
+                  <a
+                    href={app.launchUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setMenuOpen(false)}
+                    className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-muted transition"
+                  >
+                    <ExternalLink className="size-3.5 text-muted-foreground" /> Visit app
+                  </a>
+                )}
+                {canArchive && (
+                  <button
+                    onClick={() => { setMenuOpen(false); onArchive(); }}
+                    disabled={isArchiving}
+                    className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-muted transition text-left"
+                  >
+                    {isArchiving ? <Loader2 className="size-3.5 animate-spin" /> : <Archive className="size-3.5 text-muted-foreground" />}
+                    Archive
+                  </button>
+                )}
+                <button
+                  onClick={() => { setMenuOpen(false); onDelete(); }}
+                  disabled={isDeleting}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-destructive/10 text-destructive transition text-left"
+                >
+                  {isDeleting ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+                  Delete
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
-      {app.launchUrl && (
-        <a href={app.launchUrl} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground">
-          <ExternalLink className="size-4" />
-        </a>
+
+      {/* Tagline */}
+      {app.tagline && (
+        <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed -mt-1">{app.tagline}</p>
       )}
-      {canArchive && (
-        <button
-          onClick={onArchive}
-          disabled={isArchiving}
-          className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-yellow-600"
-          title="Archive (hide from public)"
-        >
-          {isArchiving ? <Loader2 className="size-4 animate-spin" /> : <Archive className="size-4" />}
-        </button>
-      )}
-      <button
-        onClick={onDelete}
-        disabled={isDeleting}
-        className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-        title="Delete permanently"
-      >
-        {isDeleting ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
-      </button>
+
+      {/* Bottom row */}
+      <div className="flex items-center justify-between mt-auto pt-1 border-t border-border">
+        <span className="text-xs text-muted-foreground">
+          {new Date(app.publishedAt ?? app.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+        </span>
+        {views !== null && (
+          <div className="flex items-center gap-1 text-xs font-semibold text-foreground/70">
+            <Eye className="size-3.5 text-mint" />
+            {views.toLocaleString()} visits
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Mini Stat ─────────────────────────────────────────────────────────────────
+
+function MiniStat({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: number; tone: "primary" | "mint" | "default" }) {
+  const bg = tone === "primary" ? "bg-primary-soft" : tone === "mint" ? "bg-mint-soft" : "bg-card";
+  return (
+    <div className={`${bg} border border-border rounded-2xl px-4 py-3 flex items-center gap-3`}>
+      <span className={tone === "mint" ? "text-mint" : tone === "primary" ? "text-foreground/70" : "text-muted-foreground"}>{icon}</span>
+      <div>
+        <div className="font-display text-2xl leading-none">{value.toLocaleString()}</div>
+        <div className="text-xs text-muted-foreground mt-0.5">{label}</div>
+      </div>
     </div>
   );
 }

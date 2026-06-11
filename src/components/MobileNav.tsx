@@ -5,11 +5,33 @@ import { useStore } from "@/lib/store";
 
 export function MobileNav() {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const { users: storeUsers, currentUserId } = useStore();
   const storeUser = storeUsers.find((u) => u.id === currentUserId);
   const profileUsername = storeUser?.username ?? "you";
   const is = (p: string) => pathname === p;
+  const youActive = pathname.startsWith("/u/") || is("/dashboard");
+
+  const avatarEl = isAuthenticated && user ? (
+    user.avatarUrl ? (
+      <img
+        src={user.avatarUrl}
+        alt=""
+        className="size-7 rounded-full object-cover ring-2 ring-background"
+      />
+    ) : (() => {
+      const name = user.displayName ?? user.email;
+      const hue = name.split("").reduce((n, c) => n + c.charCodeAt(0), 0) % 360;
+      return (
+        <span
+          className="grid place-items-center size-7 rounded-full text-[11px] font-bold text-white ring-2 ring-background"
+          style={{ background: `oklch(0.65 0.18 ${hue})` }}
+        >
+          {name.slice(0, 2).toUpperCase()}
+        </span>
+      );
+    })()
+  ) : <User className="size-5" />;
 
   return (
     <nav
@@ -46,12 +68,12 @@ export function MobileNav() {
               className="flex flex-col items-center justify-center gap-1 h-full py-2"
             >
               <span className={`flex items-center justify-center size-9 rounded-2xl transition-all duration-150 ${
-                pathname.startsWith("/u/") ? "bg-foreground/8 text-foreground scale-105" : "text-foreground/45 hover:text-foreground/70"
+                youActive ? "bg-foreground/8 text-foreground scale-105" : "text-foreground/45 hover:text-foreground/70"
               }`}>
-                <User className="size-5" />
+                {avatarEl}
               </span>
               <span className={`text-[9.5px] font-semibold tracking-wide leading-none transition-colors ${
-                pathname.startsWith("/u/") ? "text-foreground" : "text-foreground/45"
+                youActive ? "text-foreground" : "text-foreground/45"
               }`}>
                 Profile
               </span>

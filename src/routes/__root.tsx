@@ -4,6 +4,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
 } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { Header } from "@/components/Header";
@@ -75,23 +76,29 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const { location } = useRouterState();
+  const isLandingPage = location.pathname === "/landing";
 
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <div className="w-full min-h-screen flex flex-col">
-          <Header />
-          <main className="flex-1 pb-20 md:pb-0">
-            <Outlet />
-          </main>
-          <footer className="border-t border-border py-10 mt-10 hidden md:block">
-            <div className="mx-auto max-w-6xl px-4 text-sm text-muted-foreground flex flex-wrap items-center justify-between gap-3">
-              <p>Built with care by indie makers, for indie makers.</p>
-              <p>© {new Date().getFullYear()} Imagine</p>
-            </div>
-          </footer>
-          <MobileNav />
-        </div>
+        {isLandingPage ? (
+          <Outlet />
+        ) : (
+          <div className="w-full min-h-screen flex flex-col">
+            <Header />
+            <main className="flex-1 pb-20 md:pb-0">
+              <Outlet />
+            </main>
+            <footer className="border-t border-border py-10 mt-10 hidden md:block">
+              <div className="mx-auto max-w-6xl px-4 text-sm text-muted-foreground flex flex-wrap items-center justify-between gap-3">
+                <p>Built with care by indie makers, for indie makers.</p>
+                <p>© {new Date().getFullYear()} Imagine</p>
+              </div>
+            </footer>
+            <MobileNav />
+          </div>
+        )}
         <Toaster position="top-center" />
       </AuthProvider>
     </QueryClientProvider>
