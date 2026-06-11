@@ -13,6 +13,7 @@ import { Route as WelcomeBackRouteImport } from './routes/welcome-back'
 import { Route as TrendingRouteImport } from './routes/trending'
 import { Route as SubmitRouteImport } from './routes/submit'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as LandingRouteImport } from './routes/landing'
 import { Route as InfoRouteImport } from './routes/info'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
@@ -37,6 +38,11 @@ const SubmitRoute = SubmitRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LandingRoute = LandingRouteImport.update({
+  id: '/landing',
+  path: '/landing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InfoRoute = InfoRouteImport.update({
@@ -69,6 +75,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/info': typeof InfoRoute
+  '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
   '/submit': typeof SubmitRoute
   '/trending': typeof TrendingRoute
@@ -80,6 +87,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/info': typeof InfoRoute
+  '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
   '/submit': typeof SubmitRoute
   '/trending': typeof TrendingRoute
@@ -92,6 +100,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/info': typeof InfoRoute
+  '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
   '/submit': typeof SubmitRoute
   '/trending': typeof TrendingRoute
@@ -105,6 +114,7 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/info'
+    | '/landing'
     | '/login'
     | '/submit'
     | '/trending'
@@ -116,6 +126,7 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/info'
+    | '/landing'
     | '/login'
     | '/submit'
     | '/trending'
@@ -127,6 +138,7 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/info'
+    | '/landing'
     | '/login'
     | '/submit'
     | '/trending'
@@ -139,6 +151,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
   InfoRoute: typeof InfoRoute
+  LandingRoute: typeof LandingRoute
   LoginRoute: typeof LoginRoute
   SubmitRoute: typeof SubmitRoute
   TrendingRoute: typeof TrendingRoute
@@ -175,6 +188,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/landing': {
+      id: '/landing'
+      path: '/landing'
+      fullPath: '/landing'
+      preLoaderRoute: typeof LandingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/info': {
@@ -219,6 +239,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
   InfoRoute: InfoRoute,
+  LandingRoute: LandingRoute,
   LoginRoute: LoginRoute,
   SubmitRoute: SubmitRoute,
   TrendingRoute: TrendingRoute,
